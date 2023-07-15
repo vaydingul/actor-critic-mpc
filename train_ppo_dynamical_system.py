@@ -6,14 +6,14 @@ from wrapper import RelativePosition
 from stable_baselines3 import A2C, PPO
 
 print("Create environment")
-env = gym.make("DynamicalSystem-v0", render_mode='rgb_array', size = 10, distance_threshold = 0.2)
+env = gym.make("DynamicalSystem-v0", render_mode='rgb_array', size = 20, distance_threshold = 0.2)
 env = RelativePosition(env)
 env = FlattenObservation(env)
 print("Create model")
 model = PPO("MlpPolicy", env, verbose=2)
 
 print("Train model")
-model.learn(total_timesteps=100_000)
+model.learn(total_timesteps=200_000)
 
 print("Fetch model")
 vec_env = model.get_env()

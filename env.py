@@ -11,7 +11,7 @@ from gymnasium.envs.registration import register
 register(
 	id="DynamicalSystem-v0",
 	entry_point="env:DynamicalSystemEnvironment",
-	max_episode_steps=100,
+	max_episode_steps=500,
 	kwargs={"size": 5, "distance_threshold": 0.5},
 )
 
@@ -35,7 +35,7 @@ class DynamicalSystemEnvironment(gym.Env):
 		)
 		
 		# We have continuous actions, basically a force vector.
-		self.action_space = spaces.Box(-1.0, 1.0, shape=(2,), dtype=float)
+		self.action_space = spaces.Box(-10.0, 10.0, shape=(2,), dtype=float)
 
 		self._dt = 0.1  # The time step of the simulation
 		
@@ -58,8 +58,7 @@ class DynamicalSystemEnvironment(gym.Env):
 
 		# Assign a random continuous location for the agent and the target.
 		self._agent_location = self.observation_space["agent_location"].sample()
-		# Zero velocity at the beginning
-		self._agent_velocity = np.zeros(2)
+		self._agent_velocity = self.observation_space["agent_velocity"].sample()
 		self._target_location = self.observation_space["target_location"].sample()
 		self._action = np.zeros(2)
 		observation = self._get_obs()
@@ -72,7 +71,7 @@ class DynamicalSystemEnvironment(gym.Env):
 
 	def step(self, action: np.ndarray) -> tuple[Any, float, bool, dict[str, Any]]:
 		self._action = action
-		_force = action
+		_force = action - self._get_dir_vec() * 0.1
 		_acceleration = _force # Assume mass = 1
 
 		_velocity = self._agent_velocity + _acceleration * self._dt
@@ -99,12 +98,12 @@ class DynamicalSystemEnvironment(gym.Env):
 		info = self._get_info()
 
 		distance = info["distance"]
-		if (distance < self.distance_threshold):
+		if (distance < self.distance_threshold) and (np.linalg.norm(self._agent_velocity) < 0.1):
 			target_reached = True
 		
 
 		# The episode terminates when the agent reaches the target.
-		if target_reached: # or (out_of_bounds):
+		if target_reached or out_of_bounds:
 			terminated = True
 		else:
 			terminated = False
@@ -159,15 +158,15 @@ class DynamicalSystemEnvironment(gym.Env):
 		# Draw a circle to indicate the distance threshold.
 		distance_threshold = self._scale_size(self.distance_threshold)
 		pygame.draw.circle(
-			canvas, (0, 0, 0), agent_location, distance_threshold, width=1
+			canvas, (0, 0, 0), target_location, distance_threshold, width=1
 		)
 
 
-		# Draw the velocity vector.
+		# Draw the velocity vector. Magenta
 		velocity_vector = self._scale_vector(0.2 * self._agent_velocity)
 		pygame.draw.line(
 			canvas,
-			(0, 0, 0),
+			(255, 0, 255),
 			agent_location,
 			(agent_location[0] + velocity_vector[0], agent_location[1] + velocity_vector[1]),
 			width=2,
@@ -194,14 +193,14 @@ class DynamicalSystemEnvironment(gym.Env):
 		)
 		canvas.blit(text, text_rect)
 
-		# Draw the action vector.
+		# Draw the action vector. Cyan
 		action_vector = self._scale_vector(0.2 * self._action)
 		pygame.draw.line(
 			canvas,
-			(0, 0, 0),
+			(0, 255, 255),
 			agent_location,
-			(agent_location[0] + action_vector[0], agent_location[1] + action_vector[1]),
-			width=2,
+			(agent_location[0] + action_vector[0] * 5, agent_location[1] + action_vector[1] * 5),
+			width=4,
 		)
 
 		# Put additional information on the screen.
@@ -268,6 +267,16 @@ class DynamicalSystemEnvironment(gym.Env):
 			"agent_velocity": self._agent_velocity,
 			"target_location": self._target_location,
 		}
+
+	def _get_dir_vec(self):
+		# Unit vector in the direction of velocity vector
+		velocity = self._agent_velocity
+		norm = np.linalg.norm(velocity)
+		if norm == 0:
+			return velocity
+		return velocity / norm
+	
+
 
 	def _get_info(self):
 		return {
