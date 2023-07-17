@@ -54,30 +54,14 @@ mpc = ModelPredictiveControl(
 mpc.reset()
 
 
-agent_location = torch.Tensor(observation[:2])
+agent_location = torch.Tensor(observation[:2]).requires_grad_(True)
 agent_velocity = torch.Tensor(observation[2:4])
 target_location = torch.Tensor(observation[4:6])
 target_velocity = torch.Tensor(observation[6:8])
 
+action = mpc(agent_location, agent_velocity, target_location, target_velocity)
 
-while True:
-    action = mpc(agent_location, agent_velocity, target_location, target_velocity)
+action_sum = action.sum()
 
-    action_selected = action[0]
-
-    (agent_location, agent_velocity, target_location, target_velocity) = system(
-        agent_location,
-        agent_velocity,
-        target_location,
-        target_velocity,
-        action_selected,
-    )
-
-    print(f"Agent location: {agent_location}")
-    print(f"Agent velocity: {agent_velocity}")
-    print(f"Target location: {target_location}")
-    print(f"Target velocity: {target_velocity}")
-    print(f"Action: {action_selected}")
-
-    mpc.render()
-    mpc.reset()
+# Differentiate action_sum with respect to agent_location
+torch.autograd.grad(action_sum, agent_location)

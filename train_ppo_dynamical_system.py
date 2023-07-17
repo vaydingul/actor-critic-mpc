@@ -4,29 +4,61 @@ import gymnasium as gym
 from gymnasium.wrappers import FlattenObservation
 from wrapper import RelativePosition
 from stable_baselines3 import A2C, PPO
+from system import DynamicalSystem
 
-print("Create environment")
-env = gym.make("DynamicalSystem-v0", render_mode='rgb_array', size = 20, distance_threshold = 0.2)
-env = RelativePosition(env)
-env = FlattenObservation(env)
-print("Create model")
-model = PPO("MlpPolicy", env, verbose=2)
 
-print("Train model")
-model.learn(total_timesteps=200_000)
+def main():
+    size = 20
+    window_size = 512
+    agent_location_noise_level = 0.1
+    agent_velocity_noise_level = 0.01
+    target_location_noise_level = 0.0
+    target_velocity_noise_level = 0.00
 
-print("Fetch model")
-vec_env = model.get_env()
+    # Create system
+    system = DynamicalSystem(
+        size=size,
+        random_force_probability=0.01,
+        random_force_magnitude=10.0,
+        friction_coefficient=0.1,
+        wind_gust=[0.5, 0.5],
+        wind_gust_region=[[0.3, 0.7], [0.3, 0.7]],
+    )
 
-print("Reset environment")
-obs = vec_env.reset()
+    # Create environment
+    env = gym.make(
+        "DynamicalSystem-v0",
+        render_mode="rgb_array",
+        size=size,
+        window_size=window_size,
+        distance_threshold=1.0,
+        system=system,
+        agent_location_noise_level=agent_location_noise_level,
+        agent_velocity_noise_level=agent_velocity_noise_level,
+        target_location_noise_level=target_location_noise_level,
+        target_velocity_noise_level=target_velocity_noise_level,
+        force_penalty_level=0.1,
+    )
+    env = RelativePosition(env)
+    env = FlattenObservation(env)
 
-print("Predict")
-for i in range(10000000):
-	print(i)
-	action, _state = model.predict(obs, deterministic=True)
-	print(action)
-	obs, reward, done, information = vec_env.step(action)
-	vec_env.render("human")
+    # Create model
+    model = PPO("MlpPolicy", env, verbose=2)
 
-	
+    # Train model
+    model.learn(total_timesteps=100_000)
+
+    # Fetch model
+    vec_env = model.get_env()
+
+    # Reset environment
+    obs = vec_env.reset()
+
+    while True:
+        action, _state = model.predict(obs, deterministic=True)
+        obs, reward, done, information = vec_env.step(action)
+        vec_env.render("human")
+
+
+if __name__ == "__main__":
+    main()

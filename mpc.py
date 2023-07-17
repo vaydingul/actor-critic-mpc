@@ -1,12 +1,29 @@
 import torch
 from torch import nn
 import pygame
+import utils
+
 pygame.font.init()
+torch.autograd.set_detect_anomaly(True)
 
 
 class ModelPredictiveControl(nn.Module):
-    
-	def __init__(self, system, action_size = 2, control_horizon = 1, prediction_horizon = 10,num_optimization_step = 40, lr = 1e-2, size = 10, window_size = 512) -> None:
+	def __init__(
+		self,
+		system,
+		action_size=2,
+		control_horizon=1,
+		prediction_horizon=10,
+		num_optimization_step=40,
+		lr=1e-2,
+		size=10,
+		window_size=512,
+		agent_location_noise_level=0.05,
+		agent_velocity_noise_level=0.05,
+		target_location_noise_level=0.05,
+		target_velocity_noise_level=0.05,
+		force_penalty_level=0.0,
+	) -> None:
 		super().__init__()
 		self.system = system
 		self.action_size = action_size
@@ -16,58 +33,136 @@ class ModelPredictiveControl(nn.Module):
 		self.lr = lr
 		self.size = size
 		self.window_size = window_size
-	
-		
+		self.agent_location_noise_level = agent_location_noise_level
+		self.agent_velocity_noise_level = agent_velocity_noise_level
+		self.target_location_noise_level = target_location_noise_level
+		self.target_velocity_noise_level = target_velocity_noise_level
 
-	def forward(self, observation: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+	def forward(
+		self,
+		agent_location: torch.Tensor,
+		agent_velocity: torch.Tensor,
+		target_location: torch.Tensor,
+		target_velocity: torch.Tensor,
+	) -> torch.Tensor:
 		"""
 		Args:
-			observation (torch.Tensor): The observation tensor. The shape of the tensor is (batch_size, observation_size).
+																																																																																																																																		observation (torch.Tensor): The observation tensor. The shape of the tensor is (batch_size, observation_size).
 		Returns:
-			torch.Tensor: The action tensor. The shape of the tensor is (batch_size, action_size).
+																																																																																																																																		torch.Tensor: The action tensor. The shape of the tensor is (batch_size, action_size).
 		"""
-		self._observation = observation
-		self._target = target
+		self._agent_location_original = agent_location
+		self._agent_velocity_original = agent_velocity
+		self._target_location_original = target_location
+		self._target_velocity_original = target_velocity
 
-		return self._optimize(observation, target)
+		# Add noise to the observation
+		self._agent_location = agent_location + (
+			torch.randn_like(agent_location) * self.agent_location_noise_level
+		)
+		self._agent_velocity = agent_velocity + (
+			torch.randn_like(agent_velocity) * self.agent_velocity_noise_level
+		)
+		self._target_location = target_location + (
+			torch.randn_like(target_location) * self.target_location_noise_level
+		)
+		self._target_velocity = target_velocity + (
+			torch.randn_like(target_velocity) * self.target_velocity_noise_level
+		)
 
-	
-	def _optimize(self, observation, target) -> None:
+		return self._optimize(
+			agent_location=self._agent_location,
+			agent_velocity=self._agent_velocity,
+			target_location=self._target_location,
+			target_velocity=self._target_velocity,
+		)
+
+	def _optimize(
+		self, agent_location, agent_velocity, target_location, target_velocity
+	) -> None:
 		"""
 		Optimizes the model.
 		"""
 		for _ in range(self.num_optimization_step):
-
 			self.optimizer.zero_grad()
 
-			predicted_state = self._predict(observation)
-			loss = self._loss(predicted_state, target)
+			(
+				predicted_agent_location,
+				predicted_agent_velocity,
+				predicted_target_location,
+				predicted_target_velocity,
+			) = self._predict(
+				agent_location, agent_velocity, target_location, target_velocity
+			)
+			loss = self._loss(
+				predicted_agent_location,
+				predicted_agent_velocity,
+				predicted_target_location,
+				predicted_target_velocity,
+				# self._target_location_original,
+				# self._target_velocity_original,
+			)
 			self.loss_value = loss
 			loss.backward(retain_graph=True)
 			self.optimizer.step()
 
-		action = self.action.detach()
+		self._predicted_agent_location = predicted_agent_location.detach()
+		self._predicted_agent_velocity = predicted_agent_velocity.detach()
+		self._predicted_target_location = predicted_target_location.detach()
+		self._predicted_target_velocity = predicted_target_velocity.detach()
+
+		action = self.action#.detach()
+
 		return action
 
-	def _predict(self, observation) -> torch.Tensor:
-		
-		predicted_state = torch.zeros((self.prediction_horizon, 4))
-		for i in range(self.prediction_horizon):
-			observation = self.system(observation, self.action[i])
-			predicted_state[i] = observation
-		return predicted_state
-	
-	def _loss(self, predicted_state, target) -> torch.Tensor:
+	def _predict(
+		self, agent_location, agent_velocity, target_location, target_velocity
+	) -> torch.Tensor:
+		predicted_agent_location = torch.zeros((self.prediction_horizon, 2))
+		predicted_agent_velocity = torch.zeros((self.prediction_horizon, 2))
+		predicted_target_location = torch.zeros((self.prediction_horizon, 2))
+		predicted_target_velocity = torch.zeros((self.prediction_horizon, 2))
 
+		for i in range(self.prediction_horizon):
+			(
+				agent_location,
+				agent_velocity,
+				target_location,
+				target_velocity,
+			) = self.system(
+				agent_location,
+				agent_velocity,
+				target_location,
+				target_velocity,
+				self.action[i],
+			)
+			predicted_agent_location[i] = agent_location
+			predicted_agent_velocity[i] = agent_velocity
+			predicted_target_location[i] = target_location
+			predicted_target_velocity[i] = target_velocity
+
+		return (
+			predicted_agent_location,
+			predicted_agent_velocity,
+			predicted_target_location,
+			predicted_target_velocity,
+		)
+
+	def _loss(
+		self,
+		agent_location,
+		agent_velocity,
+		target_location,
+		target_velocity,
+	) -> torch.Tensor:
 		# Calculate the loss
 		# predicted_state -> (prediction_horizon, 4)
 		# target -> (4,)
-		
+
 		# Calculate the distance
-		loss = torch.norm(predicted_state - target, 2, dim=1).mean()
-		
+		loss = torch.norm(agent_location - target_location, 2, -1).mean()
+
 		return loss
-	
 
 	def reset(self) -> None:
 		"""
@@ -79,7 +174,6 @@ class ModelPredictiveControl(nn.Module):
 		self.optimizer.zero_grad()
 
 	def render(self):
-
 		# If not initialized yet, initialize the window
 		if not hasattr(self, "window"):
 			pygame.init()
@@ -87,59 +181,43 @@ class ModelPredictiveControl(nn.Module):
 			self.window = pygame.display.set_mode((self.window_size, self.window_size))
 			self.font = pygame.font.SysFont("Helvetica", 30)
 			self.clock = pygame.time.Clock()
-		
-		canvas = pygame.Surface((self.window_size, self.window_size))
-		canvas.fill((255, 255, 255))
 
-
-		# Draw the agent
-		agent_location = self._observation[:2]
-		agent_location = agent_location.clone().detach().numpy()
-		agent_location = self._scale_vector(agent_location)
-		pygame.draw.circle(canvas, (0, 0, 255), agent_location, self._scale_size(0.5))
-
-		# Draw the target
-		target_location = self._target[:2]
-		target_location = target_location.clone().detach().numpy()
-		target_location = self._scale_vector(target_location)
-		pygame.draw.circle(canvas, (255, 0, 0), target_location, self._scale_size(0.5))
-
-		# Draw the predicted trajectory
-		predicted_state = self._predict(self._observation)
-		predicted_state = predicted_state.clone().detach().numpy()
-		for i in range(self.prediction_horizon):
-			location = predicted_state[i, :2]
-			location = self._scale_vector(location)
-			pygame.draw.circle(canvas, (0, 0, 0), location, self._scale_size(0.1))
-		
-		# Draw the action
-		action = self.action.clone().detach().numpy()
-		action = self._scale_vector(action[0])
-		pygame.draw.line(canvas, (255, 0, 0), agent_location, (agent_location[0] + action[0] * 5, agent_location[1] + action[1] * 5), 1)
-
-		# Draw the text
-		text = self.font.render(f"Loss: {self.loss_value.item():.2f}", True, (0, 0, 0))
-		canvas.blit(text, (0, 0))
+		canvas = utils.render_frame(
+			size=self.size,
+			window_size=self.window_size,
+			agent_location_original=self._agent_location_original.clone()
+			.detach()
+			.numpy(),
+			agent_velocity_original=self._agent_velocity_original.clone()
+			.detach()
+			.numpy(),
+			target_location_original=self._target_location_original.clone()
+			.detach()
+			.numpy(),
+			target_velocity_original=self._target_velocity_original.clone()
+			.detach()
+			.numpy(),
+			action=self.action[0].clone().detach().numpy(),
+			distance_threshold=0.0,
+			system=self.system,
+			agent_location_noisy=self._agent_location.clone().detach().numpy(),
+			agent_velocity_noisy=self._agent_velocity.clone().detach().numpy(),
+			target_location_noisy=self._target_location.clone().detach().numpy(),
+			target_velocity_noisy=self._target_velocity.clone().detach().numpy(),
+			predicted_agent_location=self._predicted_agent_location.clone()
+			.detach()
+			.numpy(),
+			predicted_agent_velocity=self._predicted_agent_velocity.clone()
+			.detach()
+			.numpy(),
+			predicted_target_location=self._predicted_target_location.clone()
+			.detach()
+			.numpy(),
+			predicted_target_velocity=self._predicted_target_velocity.clone()
+			.detach()
+			.numpy(),
+		)
 
 		self.window.blit(canvas, (0, 0))
 		pygame.display.flip()
-		self.clock.tick(20.0)
-
-
-
-
-		
-
-	def _scale_vector(self, vector):
-		return (
-			(vector[0] / self.size * self.window_size).astype(int),
-			(vector[1] / self.size * self.window_size).astype(int),
-		)
-	
-	def _scale_size(self, size):
-		return int(size / self.size * self.window_size)
-
-
-
-
-
+		self.clock.tick(4.0)

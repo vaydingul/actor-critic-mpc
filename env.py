@@ -1,286 +1,257 @@
 from typing import Any
 import numpy as np
 import pygame
-pygame.font.init()
 
+pygame.font.init()
+import utils
 import gymnasium as gym
 from gymnasium import spaces
 
 from gymnasium.envs.registration import register
 
 register(
-	id="DynamicalSystem-v0",
-	entry_point="env:DynamicalSystemEnvironment",
-	max_episode_steps=500,
-	kwargs={"size": 5, "distance_threshold": 0.5},
+    id="DynamicalSystem-v0",
+    entry_point="env:DynamicalSystemEnvironment",
+    max_episode_steps=1000,
+    kwargs={
+        "size": 5,
+        "distance_threshold": 0.5,
+        "agent_location_noise_level": 0.0,
+        "agent_velocity_noise_level": 0.0,
+        "target_location_noise_level": 0.0,
+        "target_velocity_noise_level": 0.0,
+        "force_penalty_level": 0.0,
+    },
 )
 
+
 class DynamicalSystemEnvironment(gym.Env):
-	
-	metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 4}
+    metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 4}
 
-	def __init__(self, render_mode=None, size=5, distance_threshold = 0.5):
-		self.size = size  # The size of the square grid
-		self.distance_threshold = distance_threshold # The distance threshold for the target
-		self.window_size = 512  # The size of the PyGame window
+    def __init__(
+        self,
+        render_mode=None,
+        system=None,
+        size=5,
+        window_size=512,
+        distance_threshold=0.5,
+        agent_location_noise_level=0.05,
+        agent_velocity_noise_level=0.05,
+        target_location_noise_level=0.05,
+        target_velocity_noise_level=0.05,
+        force_penalty_level=0.0,
+    ):
+        assert (
+            system is not None
+        ), "System cannot be None. Plug a system into the environment."
 
-		# Observations are dictionaries with the agent's and the target's location.
-		# Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
-		self.observation_space = spaces.Dict(
-			{
-				"agent_location": spaces.Box(0, size, shape=(2,), dtype=float),
-				"agent_velocity": spaces.Box(-10, 10, shape=(2,), dtype=float), # (-inf, inf)
-				"target_location": spaces.Box(0, size, shape=(2,), dtype=float),
-			}
-		)
-		
-		# We have continuous actions, basically a force vector.
-		self.action_space = spaces.Box(-10.0, 10.0, shape=(2,), dtype=float)
+        self.system = system
+        self.size = size  # The size of the square grid
+        self.distance_threshold = (
+            distance_threshold  # The distance threshold for the target
+        )
+        self.agent_location_noise_level = (
+            agent_location_noise_level  # The noise level for the agent's location
+        )
+        self.agent_velocity_noise_level = (
+            agent_velocity_noise_level  # The noise level for the agent's velocity
+        )
+        self.target_location_noise_level = (
+            target_location_noise_level  # The noise level for the target's location
+        )
+        self.target_velocity_noise_level = (
+            target_velocity_noise_level  # The noise level for the target's velocity
+        )
+        self.force_penalty_level = force_penalty_level  # Whether to penalize the force
 
-		self._dt = 0.1  # The time step of the simulation
-		
-		assert render_mode is None or render_mode in self.metadata["render_modes"]
-		self.render_mode = render_mode
+        self.window_size = window_size  # The size of the PyGame window
 
-		"""
+        # Observations are dictionaries with the agent's and the target's location.
+        # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
+        self.observation_space = utils.make_observation_space(size)
+
+        # We have continuous actions, basically a force vector.
+        self.action_space = utils.make_action_space()
+
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
+
+        """
 		If human-rendering is used, `self.window` will be a reference
 		to the window that we draw to. `self.clock` will be a clock that is used
 		to ensure that the environment is rendered at the correct framerate in
 		human-mode. They will remain `None` until human-mode is used for the
 		first time.
 		"""
-		self.window = None
-		self.clock = None
+        self.window = None
+        self.clock = None
 
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[Any, dict[str, Any]]:
+        super().reset(seed=seed, options=options)
 
-	def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
-		super().reset(seed=seed, options=options)
+        # Assign a random continuous location for the agent and the target.
+        self._agent_location = self.observation_space["agent_location"].sample()
+        self._agent_velocity = self.observation_space["agent_velocity"].sample()
+        self._target_location = self.observation_space["target_location"].sample()
+        self._target_velocity = self.observation_space["target_velocity"].sample()
 
-		# Assign a random continuous location for the agent and the target.
-		self._agent_location = self.observation_space["agent_location"].sample()
-		self._agent_velocity = self.observation_space["agent_velocity"].sample()
-		self._target_location = self.observation_space["target_location"].sample()
-		self._action = np.zeros(2)
-		observation = self._get_obs()
-		info = self._get_info()
+        self._action = np.zeros(2)
+        observation = self._get_obs()
+        info = self._get_info()
 
-		if self.render_mode == "human":
-			self._render_frame()
+        if self.render_mode == "human":
+            self._render_frame()
 
-		return observation, info
+        return observation, info
 
-	def step(self, action: np.ndarray) -> tuple[Any, float, bool, dict[str, Any]]:
-		self._action = action
-		_force = action - self._get_dir_vec() * 0.1
-		_acceleration = _force # Assume mass = 1
+    def step(self, action: np.ndarray) -> tuple[Any, float, bool, dict[str, Any]]:
+        self._action = action
 
-		_velocity = self._agent_velocity + _acceleration * self._dt
+        (
+            _agent_location,
+            _agent_velocity,
+            _target_location,
+            _target_velocity,
+        ) = self.system(
+            self._agent_location,
+            self._agent_velocity,
+            self._target_location,
+            self._target_velocity,
+            action,
+        )
 
-		# Clip the velocity
-		# _velocity = np.clip(_velocity, -1, 1)
+        # Real states
+        self._agent_location_original = _agent_location.copy()
+        self._agent_velocity_original = _agent_velocity.copy()
+        self._target_location_original = _target_location.copy()
+        self._target_velocity_original = _target_velocity.copy()
 
-		_location = self._agent_location + _velocity * self._dt
-		# _location = np.clip(_location, 0, self.size)
-		
-		out_of_bounds = False
-		target_reached = False
-		if _location[0] < 0 or _location[0] > self.size or _location[1] < 0 or _location[1] > self.size:
-			out_of_bounds = True
-			_velocity = np.zeros(2)
-			_location = self._agent_location
-		
-		
+        # Noisy observations
+        self._agent_location = _agent_location + np.random.normal(
+            0, self.agent_location_noise_level, 2
+        )
+        self._agent_velocity = _agent_velocity + np.random.normal(
+            0, self.agent_velocity_noise_level, 2
+        )
+        self._target_location = _target_location + np.random.normal(
+            0, self.target_location_noise_level, 2
+        )
+        self._target_velocity = _target_velocity + np.random.normal(
+            0, self.target_velocity_noise_level, 2
+        )
 
-		self._agent_location = _location
-		self._agent_velocity = _velocity
+        out_of_bounds = False
+        location_satisfied = False
+        velocity_satisfied = False
 
-		observation = self._get_obs()
-		info = self._get_info()
+        if (
+            self._agent_location_original[0] < 0
+            or self._agent_location_original[0] > self.size
+            or self._agent_location_original[1] < 0
+            or self._agent_location_original[1] > self.size
+            or self._target_location_original[0] < 0
+            or self._target_location_original[0] > self.size
+            or self._target_location_original[1] < 0
+            or self._target_location_original[1] > self.size
+        ):
+            out_of_bounds = True
 
-		distance = info["distance"]
-		if (distance < self.distance_threshold) and (np.linalg.norm(self._agent_velocity) < 0.1):
-			target_reached = True
-		
+        observation = self._get_obs()
+        info = self._get_info()
 
-		# The episode terminates when the agent reaches the target.
-		if target_reached or out_of_bounds:
-			terminated = True
-		else:
-			terminated = False
-		
-		
-		# reward = (out_of_bounds * -100.0) + (-target_reached * distance * 100) - 10.0
-		reward = 100.0 if target_reached  else 0 #-distance * 10.0
-		reward -= out_of_bounds * 100.0
-		if self.render_mode == "human":
-			self._render_frame()
+        distance = info["distance"]
 
+        if distance < self.distance_threshold:
+            location_satisfied = True
 
-		return observation, reward, terminated, False, info
+        if np.linalg.norm(self._agent_velocity) < 0.1:
+            velocity_satisfied = True
 
-	def render(self, render_mode="human"):
-		if render_mode is None:
-			self.render_mode = render_mode
-		elif self.render_mode == "rgb_array":
-			return self._render_frame()
+        # The episode terminates when the agent reaches the target.
+        if (location_satisfied and velocity_satisfied) or out_of_bounds:
+            terminated = True
+        else:
+            terminated = False
 
-		
-		
-	def _render_frame(self):
+        # reward = (out_of_bounds * -100.0) + (-location_satisfied * distance * 100) - 10.0
+        reward = (
+            100.0 if (location_satisfied and velocity_satisfied) else 0
+        )  # -distance * 10.0
+        reward -= out_of_bounds * 100.0
+        reward -= self.force_penalty_level * np.linalg.norm(action)
 
-		# Create a PyGame window.
-		if self.window is None and self.render_mode == "human":
-			pygame.init()
-			pygame.display.init()
-			self.window = pygame.display.set_mode(
-				(self.window_size, self.window_size)
-			)
-		if self.clock is None and self.render_mode == "human":
-			self.clock = pygame.time.Clock()
+        if self.render_mode == "human":
+            self._render_frame()
 
-		canvas = pygame.Surface((self.window_size, self.window_size))
-		canvas.fill((255, 255, 255))
+        return observation, reward, terminated, False, info
 
-		# Draw the agent.
-		agent_location = self._scale_vector(self._agent_location)
-		agent_size = self._scale_size(0.2)
-		pygame.draw.circle(
-			canvas, (255, 0, 0), agent_location, agent_size, width=0
-		)
+    def render(self, render_mode="human"):
+        if render_mode is None:
+            self.render_mode = render_mode
+        elif self.render_mode == "rgb_array":
+            return self._render_frame()
 
-		# Draw the target.
-		target_location = self._scale_vector(self._target_location)
-		target_size = self._scale_size(0.2)
-		pygame.draw.circle(
-			canvas, (0, 0, 255), target_location, target_size, width=0
-		)
+    def _render_frame(self):
+        # Create a PyGame window.
+        if self.window is None and self.render_mode == "human":
+            pygame.init()
+            pygame.display.init()
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+        if self.clock is None and self.render_mode == "human":
+            self.clock = pygame.time.Clock()
 
-		# Draw a circle to indicate the distance threshold.
-		distance_threshold = self._scale_size(self.distance_threshold)
-		pygame.draw.circle(
-			canvas, (0, 0, 0), target_location, distance_threshold, width=1
-		)
+        canvas = utils.render_frame(
+            size=self.size,
+            window_size=self.window_size,
+            agent_location_original=self._agent_location_original,
+            agent_velocity_original=self._agent_velocity_original,
+            target_location_original=self._target_location_original,
+            target_velocity_original=self._target_velocity_original,
+            action=self._action,
+            distance_threshold=self.distance_threshold,
+            system=self.system,
+            agent_location_noisy=self._agent_location,
+            agent_velocity_noisy=self._agent_velocity,
+            target_location_noisy=self._target_location,
+            target_velocity_noisy=self._target_velocity,
+        )
 
+        # Draw the canvas to the window.
+        if self.render_mode == "human":
+            self.window.blit(canvas, (0, 0))
+            pygame.display.update()
+            self.clock.tick(self.metadata["render_fps"])
+        elif self.render_mode == "rgb_array":
+            image = pygame.surfarray.array3d(canvas)
+            image = np.transpose(image, axes=(1, 0, 2))
+            return image
 
-		# Draw the velocity vector. Magenta
-		velocity_vector = self._scale_vector(0.2 * self._agent_velocity)
-		pygame.draw.line(
-			canvas,
-			(255, 0, 255),
-			agent_location,
-			(agent_location[0] + velocity_vector[0], agent_location[1] + velocity_vector[1]),
-			width=2,
-		)
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
 
-		# Draw the distance to the target.
-		distance = self._get_info()["distance"]#self._scale_size(self._get_info()["distance"])
-		pygame.draw.line(
-			canvas,
-			(0, 0, 0),
-			agent_location,
-			(target_location[0], target_location[1]),
-			width=2,
-		)
-		# Put the distance in the middle of the line.
-		text = pygame.font.SysFont("Helvetica", 20).render(
-			f"{distance:.2f}", True, (0, 0, 0)
-		)
+    def _get_obs(self):
+        return {
+            "agent_location": self._agent_location,
+            "agent_velocity": self._agent_velocity,
+            "target_location": self._target_location,
+            "target_velocity": self._target_velocity,
+        }
 
-		text_rect = text.get_rect()
-		text_rect.center = (
-			(agent_location[0] + target_location[0]) / 2,
-			(agent_location[1] + target_location[1]) / 2,
-		)
-		canvas.blit(text, text_rect)
+    def _get_dir_vec(self):
+        # Unit vector in the direction of velocity vector
+        velocity = self._agent_velocity
+        norm = np.linalg.norm(velocity)
+        if norm == 0:
+            return velocity
+        return velocity / norm
 
-		# Draw the action vector. Cyan
-		action_vector = self._scale_vector(0.2 * self._action)
-		pygame.draw.line(
-			canvas,
-			(0, 255, 255),
-			agent_location,
-			(agent_location[0] + action_vector[0] * 5, agent_location[1] + action_vector[1] * 5),
-			width=4,
-		)
-
-		# Put additional information on the screen.
-		# Action
-		text = pygame.font.SysFont("Helvetica", 20).render(
-			f"Action: {self._action}", True, (0, 0, 0)
-		)
-		canvas.blit(text, (10, 10))
-
-		# Target
-		text = pygame.font.SysFont("Helvetica", 20).render(
-			f"Target: {self._target_location}", True, (0, 0, 0)
-		)
-		canvas.blit(text, (10, 30))
-
-		# Agent
-		text = pygame.font.SysFont("Helvetica", 20).render(
-			f"Agent: {self._agent_location}", True, (0, 0, 0)
-		)
-		canvas.blit(text, (10, 50))
-
-		# Velocity
-		text = pygame.font.SysFont("Helvetica", 20).render(
-			f"Velocity: {self._agent_velocity}", True, (0, 0, 0)
-		)
-		canvas.blit(text, (10, 70))
-
-
-
-		
-		
-		
-
-
-		# Draw the canvas to the window.
-		if self.render_mode == "human":
-			self.window.blit(canvas, (0, 0))
-			pygame.display.update()
-			self.clock.tick(self.metadata["render_fps"])
-		elif self.render_mode == "rgb_array":
-			image = pygame.surfarray.array3d(canvas)
-			image = np.transpose(image, axes=(1, 0, 2))
-			return image
-
-	def close(self):
-		if self.window is not None:
-			pygame.display.quit()
-			pygame.quit()
-
-
-	def _scale_vector(self, vector):
-		return (
-			int(vector[0] / self.size * self.window_size),
-			int(vector[1] / self.size * self.window_size),
-		)
-	
-	def _scale_size(self, size):
-		return int(size / self.size * self.window_size)
-	
-
-	def _get_obs(self):
-		return {
-			"agent_location": self._agent_location,
-			"agent_velocity": self._agent_velocity,
-			"target_location": self._target_location,
-		}
-
-	def _get_dir_vec(self):
-		# Unit vector in the direction of velocity vector
-		velocity = self._agent_velocity
-		norm = np.linalg.norm(velocity)
-		if norm == 0:
-			return velocity
-		return velocity / norm
-	
-
-
-	def _get_info(self):
-		return {
-			"distance": np.linalg.norm(
-				self._agent_location - self._target_location, ord=2
-			)
-		}
+    def _get_info(self):
+        return {
+            "distance": np.linalg.norm(
+                self._agent_location - self._target_location, ord=2
+            )
+        }
