@@ -33,11 +33,15 @@ class DynamicalSystem(nn.Module):
     def forward(
         self, agent_location, agent_velocity, target_location, target_velocity, action
     ):
+        self._ZERO_VECTOR = np.zeros(2)
+        self.wind_gust = np.array(self.wind_gust)
+
         self._TORCH = isinstance(agent_location, torch.Tensor)
 
         if self._TORCH:
             self._ZERO_VECTOR = torch.Tensor(self._ZERO_VECTOR)
             self.wind_gust = torch.Tensor(self.wind_gust)
+
 
         # Agent propagation
 
@@ -86,8 +90,7 @@ class DynamicalSystem(nn.Module):
                         -self.random_force_magnitude, self.random_force_magnitude, 2
                     )
                 )
-                print("FORCE TARGET!!!!!")
-                print(_force_target)
+            
             else:
                 _force_target += np.random.uniform(
                     -self.random_force_magnitude, self.random_force_magnitude, 2

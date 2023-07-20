@@ -97,6 +97,11 @@ class DynamicalSystemEnvironment(gym.Env):
         self._target_location = self.observation_space["target_location"].sample()
         self._target_velocity = self.observation_space["target_velocity"].sample()
 
+        self._agent_location_original = self._agent_location.copy()
+        self._agent_velocity_original = self._agent_velocity.copy()
+        self._target_location_original = self._target_location.copy()
+        self._target_velocity_original = self._target_velocity.copy()
+
         self._action = np.zeros(2)
         observation = self._get_obs()
         info = self._get_info()
