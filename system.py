@@ -13,6 +13,7 @@ class DynamicalSystem(nn.Module):
         friction_coefficient=0.1,
         wind_gust=[0.0, 0.0],
         wind_gust_region=[[0.25, 0.75], [0.25, 0.75]],
+        device="cuda",
     ):
         super(DynamicalSystem, self).__init__()
 
@@ -28,7 +29,7 @@ class DynamicalSystem(nn.Module):
         self.wind_gust_region_x_upper = wind_gust_region[0][1] * size
         self.wind_gust_region_y_lower = wind_gust_region[1][0] * size
         self.wind_gust_region_y_upper = wind_gust_region[1][1] * size
-
+        self.device = device
         self._TORCH = False
 
     def forward(
@@ -37,8 +38,9 @@ class DynamicalSystem(nn.Module):
         self._TORCH = isinstance(agent_location, torch.Tensor)
 
         if self._TORCH:
-            self._ZERO_VECTOR = torch.zeros_like(agent_location)
-            self.wind_gust = torch.Tensor(self.wind_gust)
+            self._ZERO_VECTOR = torch.zeros_like(agent_location, device=self.device)
+
+            self.wind_gust = torch.Tensor(self.wind_gust, device=self.device)
 
         else:
             self._ZERO_VECTOR = np.zeros_like(agent_location)
@@ -98,7 +100,8 @@ class DynamicalSystem(nn.Module):
                 _force_target += torch.Tensor(
                     np.random.uniform(
                         -self.random_force_magnitude, self.random_force_magnitude, 2
-                    )
+                    ),
+                    device=self.device,
                 )
 
             else:

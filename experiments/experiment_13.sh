@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-name=name="ppo+mpc|no_noise|no_wind|10|10"
+name=name="ppo+mpc|no_noise|wind|2|2"
 
 python train_acmpc_dynamical_system_args.py \
 	--size=20 \
@@ -14,15 +14,15 @@ python train_acmpc_dynamical_system_args.py \
 	--random_force_probability=0.0 \
 	--random_force_magnitude=0.0 \
 	--friction_coefficient=0.25 \
-	--wind_gust_x=0.0 \
-	--wind_gust_y=0.0 \
+	--wind_gust_x=0.5 \
+	--wind_gust_y=0.5 \
 	--wind_gust_region_x_min=0.3 \
 	--wind_gust_region_x_max=0.7 \
 	--wind_gust_region_y_min=0.3 \
 	--wind_gust_region_y_max=0.7 \
 	--action_size=2 \
-	--prediction_horizon=10 \
-	--num_optimization_step=10 \
+	--prediction_horizon=2 \
+	--num_optimization_step=2 \
 	--lr=2.0 \
 	--distance_threshold=1.0 \
 	--predict_action=True \

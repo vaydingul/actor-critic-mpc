@@ -30,6 +30,7 @@ def main(args):
 
     size = args.size
     batch_size = args.batch_size
+    device = args.device
 
     agent_location_noise_level = args.agent_location_noise_level
     agent_velocity_noise_level = args.agent_velocity_noise_level
@@ -56,7 +57,6 @@ def main(args):
     # Environment parameters
     distance_threshold = args.distance_threshold
 
-
     # Policy parameters
     predict_action = str_2_bool(args.predict_action)
     predict_cost = str_2_bool(args.predict_cost)
@@ -76,6 +76,7 @@ def main(args):
         friction_coefficient=friction_coefficient,
         wind_gust=wind_gust,
         wind_gust_region=wind_gust_region,
+        device=device,
     )
 
     # Create Model Predictive Control model
@@ -91,6 +92,7 @@ def main(args):
         agent_velocity_noise_level=agent_velocity_noise_level,
         target_location_noise_level=target_location_noise_level,
         target_velocity_noise_level=target_velocity_noise_level,
+        device=device,
     )
 
     # Create environment
@@ -105,7 +107,6 @@ def main(args):
         agent_velocity_noise_level=agent_velocity_noise_level,
         target_location_noise_level=target_location_noise_level,
         target_velocity_noise_level=target_velocity_noise_level,
-
     )
     env = RelativeRedundant(env)
 
@@ -159,6 +160,7 @@ if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=10)
     argprs.add_argument("--batch_size", type=int, default=2048)
+    argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.0)
     argprs.add_argument("--target_location_noise_level", type=float, default=0.0)

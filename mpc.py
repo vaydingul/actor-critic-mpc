@@ -239,6 +239,7 @@ class ModelPredictiveControlSimple(nn.Module):
         agent_velocity_noise_level=0.05,
         target_location_noise_level=0.05,
         target_velocity_noise_level=0.05,
+        device="cuda",
     ) -> None:
         super(ModelPredictiveControlSimple, self).__init__()
         self.system = system
@@ -251,6 +252,7 @@ class ModelPredictiveControlSimple(nn.Module):
         self.agent_velocity_noise_level = agent_velocity_noise_level
         self.target_location_noise_level = target_location_noise_level
         self.target_velocity_noise_level = target_velocity_noise_level
+        self.device = device
 
     def forward(
         self,
@@ -357,6 +359,7 @@ class ModelPredictiveControlSimple(nn.Module):
         if action_initial is None:
             self.action = torch.zeros(
                 (batch_size, self.prediction_horizon, self.action_size),
+                device=self.device,
                 requires_grad=True,
             )
         else:

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-name=name="ppo+vanilla|noise|no_wind|1|1"
+name=name="ppo+mpc|no_noise|no_wind|1|1"
 
 python train_acmpc_dynamical_system_args.py \
 	--size=20 \
 	--batch_size=2048 \
-	--agent_location_noise_level=0.1 \
-	--agent_velocity_noise_level=0.01 \
-	--target_location_noise_level=0.1 \
-	--target_velocity_noise_level=0.01 \
+	--device="cuda" \
+	--agent_location_noise_level=0.0 \
+	--agent_velocity_noise_level=0.00 \
+	--target_location_noise_level=0.0 \
+	--target_velocity_noise_level=0.00 \
 	--dt=0.1 \
 	--random_force_probability=0.0 \
 	--random_force_magnitude=0.0 \

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-name=name="ppo+vanilla|no_noise|no_wind|5|5"
+name=name="ppo+mpc|no_noise|no_wind|5|5"
 
 python train_acmpc_dynamical_system_args.py \
 	--size=20 \
 	--batch_size=2048 \
+	--device="cuda" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.0 \
 	--target_location_noise_level=0.0 \
