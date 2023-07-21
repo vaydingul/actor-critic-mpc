@@ -1,5 +1,5 @@
 import env
-from mpc import ModelPredictiveControl, MetaModelPredictiveControl
+from mpc import ModelPredictiveControl, ModelPredictiveControlSimple
 from system import DynamicalSystem
 from gymnasium.wrappers import FlattenObservation
 from wrapper import RelativePosition
@@ -9,10 +9,10 @@ import torch
 from torch import nn
 
 size = 20
-agent_location_noise_level = 0.0
-agent_velocity_noise_level = 0.0
-target_location_noise_level = 0.0
-target_velocity_noise_level = 0.0
+agent_location_noise_level = 0.1
+agent_velocity_noise_level = 0.01
+target_location_noise_level = 0.1
+target_velocity_noise_level = 0.01
 
 # Create system
 system = DynamicalSystem(
@@ -29,38 +29,35 @@ env = gym.make(
     "DynamicalSystem-v0",
     render_mode="human",
     size=size,
-    distance_threshold=0.5,
+    distance_threshold=1.0,
     system=system,
     agent_location_noise_level=agent_location_noise_level,
     agent_velocity_noise_level=agent_velocity_noise_level,
     target_location_noise_level=target_location_noise_level,
     target_velocity_noise_level=target_velocity_noise_level,
-    force_penalty_level=0.1,
 )
 env = FlattenObservation(env)
 
 # Create Model Predictive Control model
-mpc = ModelPredictiveControl(
+mpc = ModelPredictiveControlSimple(
     system,
     size=size,
-    lr=0.5,
+    lr=2.0,
     agent_location_noise_level=agent_location_noise_level,
     agent_velocity_noise_level=agent_velocity_noise_level,
     target_location_noise_level=target_location_noise_level,
     target_velocity_noise_level=target_velocity_noise_level,
-    num_optimization_step=20,
-    location_weight=1.0,
-    force_change_weight=0.0,
+    num_optimization_step=40,
 )
-
 
 
 while True:
     observation, _ = env.reset()
-    agent_location = torch.Tensor(observation[:2].copy())
-    agent_velocity = torch.Tensor(observation[2:4].copy())
-    target_location = torch.Tensor(observation[4:6].copy())
-    target_velocity = torch.Tensor(observation[6:8].copy())
+    observation = torch.Tensor(observation.copy()).unsqueeze(0)
+    agent_location = observation[:, :2]
+    agent_velocity = observation[:, 2:4]
+    target_location = observation[:, 4:6]
+    target_velocity = observation[:, 6:8]
 
     terminated = False
 
@@ -69,16 +66,17 @@ while True:
             agent_location, agent_velocity, target_location, target_velocity
         )
 
-        action_selected = action[0].detach().clone().numpy()
+        action_selected = action[0][0].detach().clone().numpy()
 
         observation, reward, terminated, truncated, information = env.step(
             action_selected
         )
 
-        agent_location = torch.Tensor(observation[:2].copy())
-        agent_velocity = torch.Tensor(observation[2:4].copy())
-        target_location = torch.Tensor(observation[4:6].copy())
-        target_velocity = torch.Tensor(observation[6:8].copy())
+        observation = torch.Tensor(observation.copy()).unsqueeze(0)
+        agent_location = observation[:, :2]
+        agent_velocity = observation[:, 2:4]
+        target_location = observation[:, 4:6]
+        target_velocity = observation[:, 6:8]
 
         print(f"Agent location: {agent_location}")
         print(f"Agent velocity: {agent_velocity}")
@@ -87,4 +85,3 @@ while True:
         print(f"Action: {action_selected}")
 
         env.render()
-

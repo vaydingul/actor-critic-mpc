@@ -9,17 +9,17 @@ from gymnasium.wrappers import FlattenObservation
 from wrapper import RelativePosition, RelativeRedundant
 from stable_baselines3 import PPO
 from system import DynamicalSystem
-from mpc import ModelPredictiveControlSimple
+from mpc import ModelPredictiveControlSimple, DistributionalModelPredictiveControlSimple
 
 
 def main():
-    size = 5
+    size = 20
     window_size = 512
     agent_location_noise_level = 0.0
     agent_velocity_noise_level = 0.0
     target_location_noise_level = 0.0
     target_velocity_noise_level = 0.00
-    batch_size = 100
+    batch_size = 2048
 
     # Create system
     system = DynamicalSystem(
@@ -27,7 +27,7 @@ def main():
         random_force_probability=0.000,
         random_force_magnitude=10.0,
         friction_coefficient=0.25,
-        wind_gust=[0.1, 0.1],
+        wind_gust=[0.5, 0.5],
         wind_gust_region=[[0.3, 0.7], [0.3, 0.7]],
     )
 
@@ -36,14 +36,14 @@ def main():
     mpc_kwargs = dict(
         system=system,
         action_size=2,
-        prediction_horizon=5,
+        prediction_horizon=2,
         size=size,
-        lr=0.5,
+        lr=2.0,
         agent_location_noise_level=agent_location_noise_level,
         agent_velocity_noise_level=agent_velocity_noise_level,
         target_location_noise_level=target_location_noise_level,
         target_velocity_noise_level=target_velocity_noise_level,
-        num_optimization_step=5,
+        num_optimization_step=2,
     )
 
     # Create environment
@@ -61,11 +61,10 @@ def main():
         force_penalty_level=0.0,
     )
     env = RelativeRedundant(env)
-    env = FlattenObservation(env)
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
-    features_extractor_kwargs = dict(input_dim=4, features_dim=64)
+    features_extractor_kwargs = dict(input_dim=4, features_dim=4)
     # Policy
     policy_class = ActorCriticModelPredictiveControlPolicy
     policy_kwargs = dict(
@@ -73,7 +72,7 @@ def main():
         mpc_kwargs=mpc_kwargs,
         predict_action=False,
         predict_cost=True,
-        num_cost_terms = 2,
+        num_cost_terms=2,
         features_extractor_class=features_extractor_class,
         features_extractor_kwargs=features_extractor_kwargs,
     )
@@ -86,10 +85,13 @@ def main():
         policy_kwargs=policy_kwargs,
         n_steps=batch_size,
         batch_size=batch_size,
+        tensorboard_log="tensorboard_logs/",
     )
 
     # Train model
-    model.learn(total_timesteps=10000, progress_bar=True)
+    model.learn(
+        total_timesteps=100_000, progress_bar=True, tb_log_name="PPO_mpc_cost_size_20"
+    )
 
     # Fetch model
     vec_env = model.get_env()

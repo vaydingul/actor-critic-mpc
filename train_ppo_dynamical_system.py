@@ -8,12 +8,13 @@ from system import DynamicalSystem
 
 
 def main():
-    size = 20
+    size = 10
     window_size = 512
     agent_location_noise_level = 0.0
     agent_velocity_noise_level = 0.0
     target_location_noise_level = 0.0
     target_velocity_noise_level = 0.00
+    batch_size = 2048
 
     # Create system
     system = DynamicalSystem(
@@ -44,10 +45,17 @@ def main():
     # env = FlattenObservation(env)
 
     # Create model
-    model = PPO("MlpPolicy", env, verbose=2)
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=2,
+        n_steps=batch_size,
+        batch_size=batch_size,
+        tensorboard_log="tensorboard_logs/",
+    )
 
     # Train model
-    model.learn(total_timesteps=100_000, progress_bar=True)
+    model.learn(total_timesteps=100_000, progress_bar=True, tb_log_name="PPO_vanilla_size_10")
 
     # Fetch model
     vec_env = model.get_env()

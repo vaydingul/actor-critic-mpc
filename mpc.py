@@ -231,12 +231,10 @@ class ModelPredictiveControlSimple(nn.Module):
         self,
         system,
         action_size=2,
-        control_horizon=1,
         prediction_horizon=10,
         num_optimization_step=40,
         lr=1e-2,
         size=10,
-        window_size=512,
         agent_location_noise_level=0.05,
         agent_velocity_noise_level=0.05,
         target_location_noise_level=0.05,
@@ -245,12 +243,10 @@ class ModelPredictiveControlSimple(nn.Module):
         super(ModelPredictiveControlSimple, self).__init__()
         self.system = system
         self.action_size = action_size
-        self.control_horizon = control_horizon
         self.prediction_horizon = prediction_horizon
         self.num_optimization_step = num_optimization_step
         self.lr = lr
         self.size = size
-        self.window_size = window_size
         self.agent_location_noise_level = agent_location_noise_level
         self.agent_velocity_noise_level = agent_velocity_noise_level
         self.target_location_noise_level = target_location_noise_level
@@ -317,6 +313,7 @@ class ModelPredictiveControlSimple(nn.Module):
 
         self._reset(action_initial, batch_size)
 
+        loss = torch.tensor(0.0)
         for _ in range(self.num_optimization_step):
             (
                 predicted_agent_location,
@@ -439,91 +436,6 @@ class ModelPredictiveControlSimple(nn.Module):
         return loss
 
 
-class MetaModelPredictiveControl(ModelPredictiveControl):
-    def __init__(
-        self,
-        system,
-        action_size=2,
-        control_horizon=1,
-        prediction_horizon=10,
-        num_optimization_step=40,
-        lr=1e-2,
-        size=10,
-        window_size=512,
-        agent_location_noise_level=0.05,
-        agent_velocity_noise_level=0.05,
-        target_location_noise_level=0.05,
-        target_velocity_noise_level=0.05,
-        location_weight=0.0,
-        force_change_weight=0.0,
-    ) -> None:
-        super(MetaModelPredictiveControl, self).__init__(
-            system,
-            action_size,
-            control_horizon,
-            prediction_horizon,
-            num_optimization_step,
-            lr,
-            size,
-            window_size,
-            agent_location_noise_level,
-            agent_velocity_noise_level,
-            target_location_noise_level,
-            target_velocity_noise_level,
-            location_weight,
-            force_change_weight,
-        )
-
-        action = torch.zeros((self.prediction_horizon, self.action_size))
-        self.action = ActionNetwork(action=action)
-        self.optimizer = torchopt.MetaAdam(self.action, lr=self.lr)
-
-    def _optimize(
-        self, agent_location, agent_velocity, target_location, target_velocity
-    ) -> None:
-        """
-        Optimizes the model.
-        """
-        for _ in range(self.num_optimization_step):
-            # self.optimizer.zero_grad()
-
-            (
-                predicted_agent_location,
-                predicted_agent_velocity,
-                predicted_target_location,
-                predicted_target_velocity,
-            ) = self._predict(
-                agent_location, agent_velocity, target_location, target_velocity
-            )
-            loss = self._loss(
-                predicted_agent_location,
-                predicted_agent_velocity,
-                predicted_target_location,
-                predicted_target_velocity,
-                # self._target_location_original,
-                # self._target_velocity_original,
-            )
-            self.loss_value = loss
-            # loss.backward(retain_graph=True)
-            self.optimizer.step(loss)
-
-        self._predicted_agent_location = predicted_agent_location.detach()
-        self._predicted_agent_velocity = predicted_agent_velocity.detach()
-        self._predicted_target_location = predicted_target_location.detach()
-        self._predicted_target_velocity = predicted_target_velocity.detach()
-
-        action = self.action.get_action()  # .detach()
-
-        return action, loss
-
-    def reset(self, action_initial: Optional[torch.Tensor] = None) -> None:
-        if action_initial is None:
-            action_initial = torch.zeros((self.prediction_horizon, self.action_size))
-
-        self.action = ActionNetwork(action=action_initial)
-        self.optimizer = torchopt.MetaAdam(self.action, lr=self.lr)
-
-
 class DistributionalModelPredictiveControlSimple(ModelPredictiveControlSimple):
     def __init__(
         self,
@@ -555,17 +467,17 @@ class DistributionalModelPredictiveControlSimple(ModelPredictiveControlSimple):
             target_velocity_noise_level,
         )
 
-    def _reset(self, action_initial: torch.Tensor):
+    def _reset(self, action_initial: torch.Tensor, batch_size: int = 1) -> None:
         if action_initial is None:
             action_initial = torch.zeros(
-                (self.batch_size, self.prediction_horizon, self.action_size),
+                (batch_size, self.prediction_horizon, self.action_size),
                 requires_grad=True,
             )
 
         distribution = DiagGaussianDistribution(self.action_size)
-        distribution.proba_distribution(
+        distribution = distribution.proba_distribution(
             mean_actions=action_initial.clone(),
-            log_std=torch.zeros_like(action_initial),
+            log_std=torch.zeros_like(action_initial, requires_grad=True),
         )
 
         self.action = distribution.sample()

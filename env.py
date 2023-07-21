@@ -12,7 +12,7 @@ from gymnasium.envs.registration import register
 register(
     id="DynamicalSystem-v0",
     entry_point="env:DynamicalSystemEnvironment",
-    max_episode_steps=1000,
+    max_episode_steps=500,
     kwargs={
         "size": 5,
         "distance_threshold": 0.5,
@@ -20,7 +20,6 @@ register(
         "agent_velocity_noise_level": 0.0,
         "target_location_noise_level": 0.0,
         "target_velocity_noise_level": 0.0,
-        "force_penalty_level": 0.0,
     },
 )
 
@@ -39,7 +38,6 @@ class DynamicalSystemEnvironment(gym.Env):
         agent_velocity_noise_level=0.05,
         target_location_noise_level=0.05,
         target_velocity_noise_level=0.05,
-        force_penalty_level=0.0,
     ):
         assert (
             system is not None
@@ -62,7 +60,6 @@ class DynamicalSystemEnvironment(gym.Env):
         self.target_velocity_noise_level = (
             target_velocity_noise_level  # The noise level for the target's velocity
         )
-        self.force_penalty_level = force_penalty_level  # Whether to penalize the force
 
         self.window_size = window_size  # The size of the PyGame window
 
@@ -185,7 +182,6 @@ class DynamicalSystemEnvironment(gym.Env):
             100.0 if (location_satisfied and velocity_satisfied) else 0
         )  # -distance * 10.0
         reward -= out_of_bounds * 100.0
-        reward -= self.force_penalty_level * np.linalg.norm(action)
 
         if self.render_mode == "human":
             self._render_frame()

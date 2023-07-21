@@ -1,0 +1,7 @@
+name: acmpc
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - ipython
+prefix: /Users/volkanaydingul/miniconda3/envs/acmpc

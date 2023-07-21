@@ -5,7 +5,7 @@ import torch as th
 from torch import nn
 import numpy as np
 from functools import partial
-
+import time
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
@@ -18,7 +18,7 @@ from stable_baselines3.common.distributions import (
     StateDependentNoiseDistribution,
 )
 from stable_baselines3.common.type_aliases import Schedule, MaybeCallback
-from mpc import DistributionalModelPredictiveControlSimple
+from mpc import DistributionalModelPredictiveControlSimple, ModelPredictiveControlSimple
 
 
 class ActorCriticModelPredictiveControlFeatureExtractor(BaseFeaturesExtractor):
@@ -48,12 +48,17 @@ class ActorCriticModelPredictiveControlFeatureExtractor(BaseFeaturesExtractor):
         # Extract features from input
         # Note: If you want to use images as input,
         # you will need to define a new CNN feature extractor.
+        # self.feature_extractor = nn.Sequential(
+        #     nn.Linear(input_dim, features_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(features_dim, features_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(features_dim, features_dim),
+        # )
+
+        # Flatten feature extractor
         self.feature_extractor = nn.Sequential(
-            nn.Linear(input_dim, features_dim),
-            nn.ReLU(),
-            nn.Linear(features_dim, features_dim),
-            nn.ReLU(),
-            nn.Linear(features_dim, features_dim),
+            nn.Flatten(),
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
@@ -74,9 +79,7 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
         self,
         feature_dim: int,
         action_dim: int,
-        mpc_class: Type[
-            DistributionalModelPredictiveControlSimple
-        ] = DistributionalModelPredictiveControlSimple,
+        mpc_class: Type[ModelPredictiveControlSimple] = ModelPredictiveControlSimple,
         mpc_kwargs: Optional[Dict[str, Any]] = None,
         prediction_horizon: int = 10,
         predict_action: bool = False,
@@ -103,9 +106,9 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
         # Policy network
         self.policy_net = nn.Sequential(
             nn.Linear(feature_dim, last_layer_dim_pi),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(last_layer_dim_pi, last_layer_dim_pi),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(
                 last_layer_dim_pi,
                 action_dim * prediction_horizon if predict_action else num_cost_terms,
@@ -117,7 +120,10 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
 
         # Value network
         self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_vf), nn.ReLU()
+            nn.Linear(feature_dim, last_layer_dim_vf),
+            nn.Tanh(),
+            nn.Linear(last_layer_dim_vf, last_layer_dim_vf),
+            nn.Tanh(),
         )
 
     def forward(
@@ -145,7 +151,7 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                     (-1, self.prediction_horizon, self.action_dim)
                 )
 
-                action, _ = self.policy_net_mpc(
+                action_mpc, _ = self.policy_net_mpc(
                     agent_location,
                     agent_velocity,
                     target_location,
@@ -153,13 +159,14 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                     action_initial,
                     None,
                 )
+
             else:
                 cost_weights = policy_net_output.view((-1, self.num_cost_terms))
                 cost_dict = {
                     "location_weight": cost_weights[..., 0],
                     "velocity_weight": cost_weights[..., 1],
                 }
-                action, _ = self.policy_net_mpc(
+                action_mpc, _ = self.policy_net_mpc(
                     agent_location,
                     agent_velocity,
                     target_location,
@@ -167,8 +174,8 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                     None,
                     cost_dict,
                 )
-
-        return action[:, 0]
+        action = action_mpc[:, 0]
+        return action
 
     def forward_critic(self, features: th.Tensor) -> th.Tensor:
         return self.value_net(features)
@@ -315,7 +322,8 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         # distribution = self._get_action_dist_from_latent(latent_pi)
         distribution = DiagGaussianDistribution(action_dim=self.action_dim)
         distribution = distribution.proba_distribution(
-            mean_actions=mean_actions, log_std=th.zeros_like(mean_actions)
+            mean_actions=mean_actions,
+            log_std=th.zeros_like(mean_actions, requires_grad=True),
         )
         actions = distribution.get_actions(deterministic=deterministic)
         log_prob = distribution.log_prob(actions)
@@ -336,16 +344,16 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         """
         features = self.extract_features(obs)
         if self.share_features_extractor:
-            latent_pi, latent_vf = self.mlp_extractor(features, obs)
+            mean_actions, latent_vf = self.mlp_extractor(features, obs)
         else:
             pi_features, vf_features = features
-            latent_pi = self.mlp_extractor.forward_actor(pi_features, obs)
+            mean_actions = self.mlp_extractor.forward_actor(pi_features, obs)
             latent_vf = self.mlp_extractor.forward_critic(vf_features)
         values = self.value_net(latent_vf)
         # distribution = self._get_action_dist_from_latent(latent_pi)
         distribution = DiagGaussianDistribution(action_dim=self.action_dim)
         distribution = distribution.proba_distribution(
-            mean_actions=latent_pi, log_std=th.zeros_like(latent_pi)
+            mean_actions=mean_actions, log_std=th.zeros_like(mean_actions)
         )
         log_prob = distribution.log_prob(actions)
         return values, log_prob, distribution.entropy()
@@ -370,6 +378,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         :return: the model's action and the next hidden state
             (used in recurrent policies)
         """
+
         # Convert to torch tensor if needed
         observation = th.as_tensor(observation).to(self.device)
 
