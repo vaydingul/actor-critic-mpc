@@ -3,38 +3,38 @@ channels:
   - anaconda
   - defaults
 dependencies:
-  - appnope=0.1.2=py310hca03da5_1001
-  - asttokens=2.0.5=pyhd3eb1b0_0
-  - backcall=0.2.0=pyhd3eb1b0_0
-  - bzip2=1.0.8=h620ffc9_4
-  - ca-certificates=2022.4.26=hca03da5_0
-  - decorator=5.1.1=pyhd3eb1b0_0
-  - executing=0.8.3=pyhd3eb1b0_0
-  - ipython=8.3.0=py310hca03da5_0
-  - jedi=0.18.1=py310hca03da5_1
-  - libffi=3.4.4=hca03da5_0
-  - matplotlib-inline=0.1.2=pyhd3eb1b0_2
-  - ncurses=6.4=h313beb8_0
-  - openssl=3.0.9=h1a28f6b_0
-  - parso=0.8.3=pyhd3eb1b0_0
-  - pexpect=4.8.0=pyhd3eb1b0_3
-  - pickleshare=0.7.5=pyhd3eb1b0_1003
-  - pip=23.1.2=py310hca03da5_0
-  - prompt-toolkit=3.0.20=pyhd3eb1b0_0
-  - ptyprocess=0.7.0=pyhd3eb1b0_2
-  - pure_eval=0.2.2=pyhd3eb1b0_0
-  - python=3.10.12=hb885b13_0
-  - readline=8.2=h1a28f6b_0
-  - setuptools=67.8.0=py310hca03da5_0
-  - six=1.16.0=pyhd3eb1b0_1
-  - sqlite=3.41.2=h80987f9_0
-  - stack_data=0.2.0=pyhd3eb1b0_0
-  - tk=8.6.12=hb8d0fd4_0
-  - traitlets=5.1.1=pyhd3eb1b0_0
-  - wcwidth=0.2.5=pyhd3eb1b0_0
-  - wheel=0.38.4=py310hca03da5_0
-  - xz=5.4.2=h80987f9_0
-  - zlib=1.2.13=h5a0b063_0
+  - appnope=0.1.2
+  - asttokens=2.0.5
+  - backcall=0.2.0
+  - bzip2=1.0.8
+  - ca-certificates=2022.4.26
+  - decorator=5.1.1
+  - executing=0.8.3
+  - ipython=8.3.0
+  - jedi=0.18.1
+  - libffi=3.4.4
+  - matplotlib-inline=0.1.2
+  - ncurses=6.4
+  - openssl=3.0.9
+  - parso=0.8.3
+  - pexpect=4.8.0
+  - pickleshare=0.7.5
+  - pip=23.1.2
+  - prompt-toolkit=3.0.20
+  - ptyprocess=0.7.0
+  - pure_eval=0.2.2
+  - python=3.10.12
+  - readline=8.2
+  - setuptools=67.8.0
+  - six=1.16.0
+  - sqlite=3.41.2
+  - stack_data=0.2.0
+  - tk=8.6.12
+  - traitlets=5.1.1
+  - wcwidth=0.2.5
+  - wheel=0.38.4
+  - xz=5.4.2
+  - zlib=1.2.13
   - pip:
       - absl-py==1.4.0
       - ale-py==0.8.1
