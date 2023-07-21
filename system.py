@@ -39,12 +39,14 @@ class DynamicalSystem(nn.Module):
 
         if self._TORCH:
             self._ZERO_VECTOR = torch.zeros_like(agent_location, device=self.device)
-
             self.wind_gust = torch.Tensor(self.wind_gust).to(self.device)
 
         else:
             self._ZERO_VECTOR = np.zeros_like(agent_location)
-            self.wind_gust = np.array(self.wind_gust)
+            if isinstance(self.wind_gust, torch.Tensor):
+                self.wind_gust = self.wind_gust.detach().cpu().numpy()
+            else:
+                self.wind_gust = np.array(self.wind_gust)
 
         # Agent propagation
 
