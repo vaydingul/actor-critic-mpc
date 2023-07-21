@@ -40,7 +40,7 @@ class DynamicalSystem(nn.Module):
         if self._TORCH:
             self._ZERO_VECTOR = torch.zeros_like(agent_location, device=self.device)
 
-            self.wind_gust = torch.Tensor(self.wind_gust, device=self.device)
+            self.wind_gust = torch.Tensor(self.wind_gust).to(self.device)
 
         else:
             self._ZERO_VECTOR = np.zeros_like(agent_location)
@@ -101,8 +101,7 @@ class DynamicalSystem(nn.Module):
                     np.random.uniform(
                         -self.random_force_magnitude, self.random_force_magnitude, 2
                     ),
-                    device=self.device,
-                )
+                ).to(self.device)
 
             else:
                 _force_target += np.random.uniform(
