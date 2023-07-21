@@ -28,5 +28,5 @@ python train_acmpc_dynamical_system_args.py \
 	--predict_cost=False \
 	--num_cost_terms=2 \
 	--total_timesteps=100000 \
-	--tb_log_name=$name \
-	--save_name=$name
+	--tb_log_name="$name" \
+	--save_name="$name"
