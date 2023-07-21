@@ -2,7 +2,7 @@ import env
 
 import gymnasium as gym
 from gymnasium.wrappers import FlattenObservation
-from wrapper import RelativePosition
+from wrapper import RelativeRedundant, RelativePosition
 from stable_baselines3 import A2C, PPO
 from system import DynamicalSystem
 
@@ -40,13 +40,14 @@ def main():
         force_penalty_level=0.0,
     )
     env = RelativePosition(env)
-    env = FlattenObservation(env)
+    # env = RelativeRedundant(env)
+    # env = FlattenObservation(env)
 
     # Create model
     model = PPO("MlpPolicy", env, verbose=2)
 
     # Train model
-    model.learn(total_timesteps=400_000)
+    model.learn(total_timesteps=100_000, progress_bar=True)
 
     # Fetch model
     vec_env = model.get_env()

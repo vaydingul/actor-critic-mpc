@@ -171,7 +171,7 @@ class DynamicalSystemEnvironment(gym.Env):
         if distance < self.distance_threshold:
             location_satisfied = True
 
-        if np.linalg.norm(self._agent_velocity) < 0.1:
+        if np.linalg.norm(self._agent_velocity - self._target_velocity) < 0.5:
             velocity_satisfied = True
 
         # The episode terminates when the agent reaches the target.

@@ -252,14 +252,18 @@ def render_frame(
     # wind_gust_region = [[x_min, x_max], [y_min, y_max]]
     # Values are in [0, 1]
     if system.wind_gust is not None:
-        wind_gust_region = system.wind_gust_region.copy()
+        wind_gust_region_x_lower = system.wind_gust_region_x_lower
+        wind_gust_region_x_upper = system.wind_gust_region_x_upper
+        wind_gust_region_y_lower = system.wind_gust_region_y_lower
+        wind_gust_region_y_upper = system.wind_gust_region_y_upper
+
         # convert to (left, top, width, height) format
-        wind_gust_region_rect = [
-            wind_gust_region[0][0] * size,
-            wind_gust_region[1][0] * size,
-            (wind_gust_region[0][1] - wind_gust_region[0][0]) * size,
-            (wind_gust_region[1][1] - wind_gust_region[1][0]) * size,
-        ]
+        wind_gust_region_rect = (
+            wind_gust_region_x_lower,
+            wind_gust_region_y_lower,
+            wind_gust_region_x_upper - wind_gust_region_x_lower,
+            wind_gust_region_y_upper - wind_gust_region_y_lower,
+        )
 
         wind_gust_region_rect = scale_rect(wind_gust_region_rect, size, window_size)
 
@@ -270,8 +274,8 @@ def render_frame(
         )
         text_rect = text.get_rect()
         text_rect.center = (
-            wind_gust_region_rect[0] + wind_gust_region_rect[2] / 2,
-            wind_gust_region_rect[1] + wind_gust_region_rect[3] / 2,
+            (wind_gust_region_x_lower + wind_gust_region_x_upper) / 2,
+            (wind_gust_region_y_lower + wind_gust_region_y_upper) / 2,
         )
         canvas.blit(text, text_rect)
     return canvas

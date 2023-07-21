@@ -313,17 +313,9 @@ class ModelPredictiveControlSimple(nn.Module):
         Optimizes the model.
         """
 
-        # self.action = nn.Parameter(
-        #     torch.zeros((self.prediction_horizon, self.action_size)),
-        #     requires_grad=True,
-        # )
+        batch_size = agent_location.shape[0]
 
-        if action_initial is None:
-            self.action = torch.zeros(
-                (self.prediction_horizon, self.action_size), requires_grad=True
-            )
-        else:
-            self.action = action_initial.clone()
+        self._reset(action_initial, batch_size)
 
         for _ in range(self.num_optimization_step):
             (
@@ -362,13 +354,34 @@ class ModelPredictiveControlSimple(nn.Module):
 
         return action, loss
 
+    def _reset(
+        self, action_initial: Optional[torch.Tensor] = None, batch_size: int = 1
+    ) -> None:
+        if action_initial is None:
+            self.action = torch.zeros(
+                (batch_size, self.prediction_horizon, self.action_size),
+                requires_grad=True,
+            )
+        else:
+            self.action = action_initial.clone()
+
     def _predict(
         self, agent_location, agent_velocity, target_location, target_velocity
     ) -> torch.Tensor:
-        predicted_agent_location = torch.zeros((self.prediction_horizon, 2))
-        predicted_agent_velocity = torch.zeros((self.prediction_horizon, 2))
-        predicted_target_location = torch.zeros((self.prediction_horizon, 2))
-        predicted_target_velocity = torch.zeros((self.prediction_horizon, 2))
+        batch_size = agent_location.shape[0]
+
+        assert (
+            batch_size == self.action.shape[0]
+        ), f"Input batch size is {batch_size}. Expected batch size is {self.action.shape[0]}."
+
+        predicted_agent_location = torch.zeros((batch_size, self.prediction_horizon, 2))
+        predicted_agent_velocity = torch.zeros((batch_size, self.prediction_horizon, 2))
+        predicted_target_location = torch.zeros(
+            (batch_size, self.prediction_horizon, 2)
+        )
+        predicted_target_velocity = torch.zeros(
+            (batch_size, self.prediction_horizon, 2)
+        )
 
         for i in range(self.prediction_horizon):
             (
@@ -381,12 +394,12 @@ class ModelPredictiveControlSimple(nn.Module):
                 agent_velocity,
                 target_location,
                 target_velocity,
-                self.action[i],
+                self.action[:, i],
             )
-            predicted_agent_location[i] = agent_location
-            predicted_agent_velocity[i] = agent_velocity
-            predicted_target_location[i] = target_location
-            predicted_target_velocity[i] = target_velocity
+            predicted_agent_location[:, i] = agent_location
+            predicted_agent_velocity[:, i] = agent_velocity
+            predicted_target_location[:, i] = target_location
+            predicted_target_velocity[:, i] = target_velocity
 
         return (
             predicted_agent_location,
@@ -407,16 +420,21 @@ class ModelPredictiveControlSimple(nn.Module):
         # predicted_state -> (prediction_horizon, 4)
         # target -> (4,)
 
-        assert cost_dict is not None, "cost_dict is None"
+        if cost_dict is None:
+            cost_dict = {
+                "location_weight": 1.0,
+                "velocity_weight": 0.1,
+            }
 
         # Calculate the distance
-        location_loss = torch.norm(agent_location - target_location, 2, -1).mean()
-        action_loss = self.action.sum()
+        location_loss = torch.norm(agent_location - target_location, 2, -1).mean(dim=1)
+        velocity_loss = torch.norm(agent_velocity - target_velocity, 2, -1).mean(dim=1)
 
-        loss = (
-            location_loss * cost_dict["location_weight"]
-            + action_loss * cost_dict["action_weight"]
-        )
+        # action_loss = self.action.sum(dim=1)
+
+        loss = (location_loss * cost_dict["location_weight"]).mean() + (
+            velocity_loss * cost_dict["velocity_weight"]
+        ).mean()
 
         return loss
 
@@ -506,7 +524,7 @@ class MetaModelPredictiveControl(ModelPredictiveControl):
         self.optimizer = torchopt.MetaAdam(self.action, lr=self.lr)
 
 
-class ModelPredictiveControlDistributional(ModelPredictiveControl):
+class DistributionalModelPredictiveControlSimple(ModelPredictiveControlSimple):
     def __init__(
         self,
         system,
@@ -521,10 +539,8 @@ class ModelPredictiveControlDistributional(ModelPredictiveControl):
         agent_velocity_noise_level=0.05,
         target_location_noise_level=0.05,
         target_velocity_noise_level=0.05,
-        location_weight=0.0,
-        force_change_weight=0.0,
     ) -> None:
-        super(ModelPredictiveControlDistributional, self).__init__(
+        super(DistributionalModelPredictiveControlSimple, self).__init__(
             system,
             action_size,
             control_horizon,
@@ -537,19 +553,19 @@ class ModelPredictiveControlDistributional(ModelPredictiveControl):
             agent_velocity_noise_level,
             target_location_noise_level,
             target_velocity_noise_level,
-            location_weight,
-            force_change_weight,
         )
 
-        def reset(action_initial: torch.Tensor):
-            distribution = DiagGaussianDistribution(self.action_size)
-            distribution.proba_distribution(
-                mean_actions=action_initial.clone(),
-                log_std=torch.zeros_like(action_initial),
+    def _reset(self, action_initial: torch.Tensor):
+        if action_initial is None:
+            action_initial = torch.zeros(
+                (self.batch_size, self.prediction_horizon, self.action_size),
+                requires_grad=True,
             )
 
-            self.action = distribution.sample()
+        distribution = DiagGaussianDistribution(self.action_size)
+        distribution.proba_distribution(
+            mean_actions=action_initial.clone(),
+            log_std=torch.zeros_like(action_initial),
+        )
 
-            self.optimizer = torch.optim.Adam([self.action], lr=self.lr)
-
-            self.optimizer.zero_grad()
+        self.action = distribution.sample()

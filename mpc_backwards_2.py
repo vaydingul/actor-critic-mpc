@@ -78,12 +78,12 @@ def main():
     dummy_network = DummyNetwork()
     dummy_network.train()
 
-    observation_tensor = torch.Tensor(observation)
+    observation_tensor = torch.Tensor(observation).unsqueeze(0)
 
-    agent_location_ = observation_tensor[:2]
-    agent_velocity_ = observation_tensor[2:4]
-    target_location_ = observation_tensor[4:6]
-    target_velocity_ = observation_tensor[6:8]
+    agent_location_ = observation_tensor[..., :2]
+    agent_velocity_ = observation_tensor[..., 2:4]
+    target_location_ = observation_tensor[..., 4:6]
+    target_velocity_ = observation_tensor[..., 6:8]
 
     target_location_ = agent_location_.clone() + torch.Tensor([0.5, 0.5])
 

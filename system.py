@@ -24,24 +24,25 @@ class DynamicalSystem(nn.Module):
         )
         self.friction_coefficient = friction_coefficient  # The friction coefficient
         self.wind_gust = wind_gust  # The wind gust
-        self.wind_gust_region = (
-            wind_gust_region  # The region where the wind gust is active
-        )
+        self.wind_gust_region_x_lower = wind_gust_region[0][0] * size
+        self.wind_gust_region_x_upper = wind_gust_region[0][1] * size
+        self.wind_gust_region_y_lower = wind_gust_region[1][0] * size
+        self.wind_gust_region_y_upper = wind_gust_region[1][1] * size
+
         self._TORCH = False
-        self._ZERO_VECTOR = np.zeros(2)
 
     def forward(
         self, agent_location, agent_velocity, target_location, target_velocity, action
     ):
-        self._ZERO_VECTOR = np.zeros(2)
-        self.wind_gust = np.array(self.wind_gust)
-
         self._TORCH = isinstance(agent_location, torch.Tensor)
 
         if self._TORCH:
-            self._ZERO_VECTOR = torch.Tensor(self._ZERO_VECTOR)
+            self._ZERO_VECTOR = torch.zeros_like(agent_location)
             self.wind_gust = torch.Tensor(self.wind_gust)
 
+        else:
+            self._ZERO_VECTOR = np.zeros_like(agent_location)
+            self.wind_gust = np.array(self.wind_gust)
 
         # Agent propagation
 
@@ -49,23 +50,28 @@ class DynamicalSystem(nn.Module):
         _force_agent = (
             self._ZERO_VECTOR.clone() if self._TORCH else self._ZERO_VECTOR.copy()
         )
-        if (
-            (agent_location[0] >= self.wind_gust_region[0][0] * self.size)
-            and (agent_location[0] <= self.wind_gust_region[0][1] * self.size)
-            and (agent_location[1] >= self.wind_gust_region[1][0] * self.size)
-            and (agent_location[1] <= self.wind_gust_region[1][1] * self.size)
-        ):
-            _force_agent += self.wind_gust
+
+        agent_location_x = agent_location[..., 0]
+        agent_location_y = agent_location[..., 1]
+        agent_location_logical_x = (
+            agent_location_x >= self.wind_gust_region_x_lower
+        ) * (agent_location_x <= self.wind_gust_region_x_upper)
+        agent_location_logical_y = (
+            agent_location_y >= self.wind_gust_region_y_lower
+        ) * (agent_location_y <= self.wind_gust_region_y_upper)
+        agent_location_logical = agent_location_logical_x * agent_location_logical_y
+
+        _force_agent += self.wind_gust * agent_location_logical[..., None]
 
         _force_agent -= self.friction_coefficient * self._normalize(
-            agent_velocity, 2, -1
+            agent_velocity, 2, 1e-6
         )  # Apply friction
 
         _force_agent += action  # Apply the action
 
         _acceleration = _force_agent  # Assume mass = 1
         _agent_velocity = agent_velocity + _acceleration * self.dt
-        _agent_location = agent_location + _agent_velocity * self.dt
+        _agent_location = agent_location + agent_velocity * self.dt
 
         # Target propagation
 
@@ -73,13 +79,17 @@ class DynamicalSystem(nn.Module):
         _force_target = (
             self._ZERO_VECTOR.clone() if self._TORCH else self._ZERO_VECTOR.copy()
         )
-        if (
-            (target_location[0] >= self.wind_gust_region[0][0] * self.size)
-            and (target_location[0] <= self.wind_gust_region[0][1] * self.size)
-            and (target_location[1] >= self.wind_gust_region[1][0] * self.size)
-            and (target_location[1] <= self.wind_gust_region[1][1] * self.size)
-        ):
-            _force_target += self.wind_gust
+        target_location_x = target_location[..., 0]
+        target_location_y = target_location[..., 1]
+        target_location_logical_x = (
+            target_location_x >= self.wind_gust_region_x_lower
+        ) * (target_location_x <= self.wind_gust_region_x_upper)
+        target_location_logical_y = (
+            target_location_y >= self.wind_gust_region_y_lower
+        ) * (target_location_y <= self.wind_gust_region_y_upper)
+        target_location_logical = target_location_logical_x * target_location_logical_y
+
+        _force_target += self.wind_gust * target_location_logical[..., None]
 
         # Apply a random force to the target
 
@@ -90,7 +100,7 @@ class DynamicalSystem(nn.Module):
                         -self.random_force_magnitude, self.random_force_magnitude, 2
                     )
                 )
-            
+
             else:
                 _force_target += np.random.uniform(
                     -self.random_force_magnitude, self.random_force_magnitude, 2
