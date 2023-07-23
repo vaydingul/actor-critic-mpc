@@ -141,7 +141,7 @@ def main(args):
         total_timesteps=total_timesteps, progress_bar=True, tb_log_name=tb_log_name
     )
 
-    model.save(save_name)
+    model.save(save_name, include=["policy", "policy_kwargs"])
 
     # # Fetch model
     # vec_env = model.get_env()
