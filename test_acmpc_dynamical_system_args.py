@@ -88,10 +88,9 @@ def main(args):
         done = False
         while not done:
             action, _state = model.predict(obs[np.newaxis], deterministic=True)
-            print(action)
             obs, reward, done, _, information = env.step(action.squeeze(0))
-            print(done)
-            env.render()
+            print(reward)
+            # env.render()
 
 
 if __name__ == "__main__":
