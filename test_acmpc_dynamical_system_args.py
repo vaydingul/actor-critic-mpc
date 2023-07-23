@@ -96,7 +96,7 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
-    argprs.add_argument("--device", type=str, default="cpu")
+    argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument(
         "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|10|10"
     )
