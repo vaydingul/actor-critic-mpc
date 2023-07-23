@@ -67,7 +67,7 @@ def main(args):
     # Create environment
     env = gym.make(
         "DynamicalSystem-v0",
-        render_mode="human",
+        render_mode=None,
         size=size,
         window_size=window_size,
         distance_threshold=distance_threshold,
