@@ -30,7 +30,7 @@ def main(args):
     window_size = WINDOW_SIZE
 
     size = args.size
-
+    device = args.device
     model_name = args.model_name
 
     agent_location_noise_level = args.agent_location_noise_level
@@ -61,6 +61,7 @@ def main(args):
         friction_coefficient=friction_coefficient,
         wind_gust=wind_gust,
         wind_gust_region=wind_gust_region,
+        device=device,
     )
 
     # Create environment
@@ -79,7 +80,7 @@ def main(args):
     env = RelativeRedundant(env)
 
     # Create model
-    model = PPO.load(model_name)
+    model = PPO.load(model_name, device=device)
 
     while True:
         obs, _ = env.reset()
@@ -96,8 +97,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
+    argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument(
-        "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|1|1"
+        "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|10|10"
     )
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.1)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.01)

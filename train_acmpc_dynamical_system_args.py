@@ -134,6 +134,7 @@ def main(args):
         n_steps=batch_size,
         batch_size=batch_size,
         tensorboard_log="tensorboard_logs/",
+        device=device,
     )
 
     # Train model
@@ -141,7 +142,10 @@ def main(args):
         total_timesteps=total_timesteps, progress_bar=True, tb_log_name=tb_log_name
     )
 
-    model.save(save_name, include=["policy", "policy_kwargs"])
+    # Change device to cpu
+
+
+    model.save(save_name)
 
     # # Fetch model
     # vec_env = model.get_env()
