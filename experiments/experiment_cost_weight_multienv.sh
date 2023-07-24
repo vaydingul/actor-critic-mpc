@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
-name="ppo+mpc|no_noise|no_wind|1|1|2048"
+name="ppo+mpc|no_noise|no_wind|2|2|cost|multienv"
 
-python train_acmpc_dynamical_system_args.py \
+python train_acmpc_multienv_dynamical_system_args.py \
 	--size=20 \
-	--batch_size=2048 \
-	--device="mps:0" \
+	--n_envs=20 \
+	--batch_size=1024 \
+	--device="cpu" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.00 \
 	--target_location_noise_level=0.0 \
@@ -23,11 +24,11 @@ python train_acmpc_dynamical_system_args.py \
 	--action_size=2 \
 	--prediction_horizon=2 \
 	--num_optimization_step=2 \
-	--lr=2.0 \
+	--lr=5.0 \
 	--distance_threshold=1.0 \
-	--predict_action=True \
-	--predict_cost=False \
+	--predict_action=False \
+	--predict_cost=True \
 	--num_cost_terms=2 \
-	--total_timesteps=2048 \
+	--total_timesteps=1000000 \
 	--tb_log_name="$name" \
 	--save_name="$name"

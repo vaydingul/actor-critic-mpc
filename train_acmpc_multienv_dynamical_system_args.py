@@ -8,10 +8,40 @@ import gymnasium as gym
 from gymnasium.wrappers import FlattenObservation
 from wrapper import RelativePosition, RelativeRedundant
 from stable_baselines3 import PPO
+from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.monitor import Monitor
+
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.callbacks import EvalCallback
+
 from system import DynamicalSystem
 from mpc import ModelPredictiveControlSimple, DistributionalModelPredictiveControlSimple
+from typing import Callable
 
 WINDOW_SIZE = 512
+
+
+def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
+    """
+    Utility function for multiprocessed env.
+
+    :param env_id: (str) the environment ID
+    :param num_env: (int) the number of environment you wish to have in subprocesses
+    :param seed: (int) the inital seed for RNG
+    :param rank: (int) index of the subprocess
+    :return: (Callable)
+    """
+
+    def _init() -> gym.Env:
+        env = gym.make(*args, **kwargs)
+        env = RelativeRedundant(env)
+        env = Monitor(env)
+        env.reset(seed=seed + rank)
+        return env
+
+    set_random_seed(seed)
+    return _init
 
 
 def str_2_bool(v):
@@ -29,6 +59,7 @@ def main(args):
     window_size = WINDOW_SIZE
 
     size = args.size
+    n_envs = args.n_envs
     batch_size = args.batch_size
     device = args.device
 
@@ -96,7 +127,9 @@ def main(args):
     )
 
     # Create environment
-    env = gym.make(
+    env = make_env(
+        rank=0,
+        seed=0,
         id="DynamicalSystem-v0",
         render_mode="rgb_array",
         size=size,
@@ -108,7 +141,26 @@ def main(args):
         target_location_noise_level=target_location_noise_level,
         target_velocity_noise_level=target_velocity_noise_level,
     )
-    env = RelativeRedundant(env)
+
+    env = SubprocVecEnv(
+        [
+            make_env(
+                rank=i,
+                seed=0,
+                id="DynamicalSystem-v0",
+                render_mode="rgb_array",
+                size=size,
+                window_size=window_size,
+                distance_threshold=distance_threshold,
+                system=system,
+                agent_location_noise_level=agent_location_noise_level,
+                agent_velocity_noise_level=agent_velocity_noise_level,
+                target_location_noise_level=target_location_noise_level,
+                target_velocity_noise_level=target_velocity_noise_level,
+            )
+            for i in range(n_envs)
+        ]
+    )
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -139,7 +191,9 @@ def main(args):
 
     # Train model
     model.learn(
-        total_timesteps=total_timesteps, progress_bar=True, tb_log_name=tb_log_name
+        total_timesteps=total_timesteps,
+        progress_bar=True,
+        tb_log_name=tb_log_name,
     )
 
     # Change device to cpu
@@ -150,6 +204,7 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=10)
+    argprs.add_argument("--n_envs", type=int, default=4)
     argprs.add_argument("--batch_size", type=int, default=2048)
     argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
