@@ -1,3 +1,4 @@
+from glob import glob
 import env
 from argparse import ArgumentParser
 from policy import (
@@ -6,11 +7,11 @@ from policy import (
 )
 import gymnasium as gym
 import numpy as np
-from gymnasium.wrappers import FlattenObservation
-from wrapper import RelativePosition, RelativeRedundant
+from wrapper import RelativeRedundant
 from stable_baselines3 import PPO
 from system import DynamicalSystem
-from mpc import ModelPredictiveControlSimple, DistributionalModelPredictiveControlSimple
+from stable_baselines3.common.evaluation import evaluate_policy
+import pandas as pd
 
 WINDOW_SIZE = 512
 
@@ -31,7 +32,9 @@ def main(args):
 
     size = args.size
     device = args.device
-    model_name = args.model_name
+    models_path = args.models_path
+    evaluation_name = args.evaluation_name
+    num_episodes = args.num_episodes
 
     agent_location_noise_level = args.agent_location_noise_level
     agent_velocity_noise_level = args.agent_velocity_noise_level
@@ -79,27 +82,44 @@ def main(args):
     )
     env = RelativeRedundant(env)
 
-    # Create model
-    model = PPO.load(model_name, device=device)
+    results_dict = dict()
 
-    while True:
-        obs, _ = env.reset()
+    for file in glob(models_path + "*.zip"):
 
-        done = False
-        while not done:
-            action, _state = model.predict(obs[np.newaxis], deterministic=True)
-            obs, reward, done, _, information = env.step(action.squeeze(0))
-            # print(reward)
-            env.render()
+
+        try:
+            # Create model
+            model = PPO.load(file, device=device)
+
+        except:
+            print(f"Failed to load model {file}")
+            continue
+        # Evaluate model
+        mean_reward, std_reward = evaluate_policy(
+            model,
+            env,
+            n_eval_episodes=num_episodes,
+            deterministic=False,
+            render=False,
+            callback=None,
+            reward_threshold=None,
+            return_episode_rewards=False,
+        )
+
+        results_dict[file] = [mean_reward, std_reward]
+
+    # Save via pandas
+    results_df = pd.DataFrame.from_dict(results_dict, orient="index")
+    results_df.to_csv(evaluation_name + ".csv")
 
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
     argprs.add_argument("--device", type=str, default="cuda")
-    argprs.add_argument(
-        "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|10|10"
-    )
+    argprs.add_argument("--models_path", type=str, default="models_new/")
+    argprs.add_argument("--evaluation_name", type=str, default="high_noise_high_wind")
+    argprs.add_argument("--num_episodes", type=int, default=1)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.5)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.1)
     argprs.add_argument("--target_location_noise_level", type=float, default=0.5)
