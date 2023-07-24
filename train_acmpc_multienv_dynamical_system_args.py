@@ -5,18 +5,15 @@ from policy import (
     ActorCriticModelPredictiveControlFeatureExtractor,
 )
 import gymnasium as gym
-from gymnasium.wrappers import FlattenObservation
-from wrapper import RelativePosition, RelativeRedundant
+from wrapper import RelativeRedundant
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from system import DynamicalSystem
-from mpc import ModelPredictiveControlSimple, DistributionalModelPredictiveControlSimple
+from mpc import ModelPredictiveControlSimple
 from typing import Callable
 
 WINDOW_SIZE = 512
