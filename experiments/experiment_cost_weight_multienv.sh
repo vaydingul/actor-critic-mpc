@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-name="ppo+mpc|no_noise|no_wind|2|2|cost|multienv"
+name="models_new/ppo+mpc|no_noise|no_wind|2|2|cost|multienv"
 
 python train_acmpc_multienv_dynamical_system_args.py \
 	--size=20 \

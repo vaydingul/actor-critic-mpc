@@ -29,6 +29,6 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--predict_action=True \
 	--predict_cost=False \
 	--num_cost_terms=2 \
-	--total_timesteps=100000 \
+	--total_timesteps=1000000 \
 	--tb_log_name="$name" \
 	--save_name="$name"

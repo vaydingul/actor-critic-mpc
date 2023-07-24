@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-name="ppo+mpc|no_noise|no_wind|2|2|cost"
+name="models_new/ppo+mpc|no_noise|no_wind|2|2|cost"
 
-python train_acmpc_dynamical_system_args.py \
+python train_acmpc_multienv_dynamical_system_args.py \
+	--n_envs=40 \
 	--size=20 \
 	--batch_size=2048 \
 	--device="cpu" \
@@ -28,6 +29,6 @@ python train_acmpc_dynamical_system_args.py \
 	--predict_action=False \
 	--predict_cost=True \
 	--num_cost_terms=2 \
-	--total_timesteps=100000 \
+	--total_timesteps=1000000 \
 	--tb_log_name="$name" \
 	--save_name="$name"
