@@ -67,7 +67,7 @@ def main(args):
     # Create environment
     env = gym.make(
         "DynamicalSystem-v0",
-        render_mode=None,
+        render_mode="human",
         size=size,
         window_size=window_size,
         distance_threshold=distance_threshold,
@@ -89,8 +89,8 @@ def main(args):
         while not done:
             action, _state = model.predict(obs[np.newaxis], deterministic=True)
             obs, reward, done, _, information = env.step(action.squeeze(0))
-            print(reward)
-            # env.render()
+            # print(reward)
+            env.render()
 
 
 if __name__ == "__main__":
@@ -100,20 +100,20 @@ if __name__ == "__main__":
     argprs.add_argument(
         "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|10|10"
     )
-    argprs.add_argument("--agent_location_noise_level", type=float, default=0.1)
-    argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.01)
-    argprs.add_argument("--target_location_noise_level", type=float, default=0.1)
-    argprs.add_argument("--target_velocity_noise_level", type=float, default=0.01)
+    argprs.add_argument("--agent_location_noise_level", type=float, default=0.5)
+    argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.1)
+    argprs.add_argument("--target_location_noise_level", type=float, default=0.5)
+    argprs.add_argument("--target_velocity_noise_level", type=float, default=0.1)
     argprs.add_argument("--dt", type=float, default=0.1)
     argprs.add_argument("--random_force_probability", type=float, default=0.001)
     argprs.add_argument("--random_force_magnitude", type=float, default=10.0)
     argprs.add_argument("--friction_coefficient", type=float, default=0.25)
-    argprs.add_argument("--wind_gust_x", type=float, default=0.5)
-    argprs.add_argument("--wind_gust_y", type=float, default=0.5)
-    argprs.add_argument("--wind_gust_region_x_min", type=float, default=0.3)
-    argprs.add_argument("--wind_gust_region_x_max", type=float, default=0.7)
-    argprs.add_argument("--wind_gust_region_y_min", type=float, default=0.3)
-    argprs.add_argument("--wind_gust_region_y_max", type=float, default=0.7)
+    argprs.add_argument("--wind_gust_x", type=float, default=1.0)
+    argprs.add_argument("--wind_gust_y", type=float, default=1.0)
+    argprs.add_argument("--wind_gust_region_x_min", type=float, default=0.2)
+    argprs.add_argument("--wind_gust_region_x_max", type=float, default=0.8)
+    argprs.add_argument("--wind_gust_region_y_min", type=float, default=0.2)
+    argprs.add_argument("--wind_gust_region_y_max", type=float, default=0.8)
     argprs.add_argument("--distance_threshold", type=float, default=1.0)
 
     args = argprs.parse_args()

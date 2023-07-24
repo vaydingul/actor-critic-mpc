@@ -117,10 +117,10 @@ class DynamicalSystemEnvironment(gym.Env):
             _target_location,
             _target_velocity,
         ) = self.system(
-            self._agent_location,
-            self._agent_velocity,
-            self._target_location,
-            self._target_velocity,
+            self._agent_location_original,
+            self._agent_velocity_original,
+            self._target_location_original,
+            self._target_velocity_original,
             action,
         )
 

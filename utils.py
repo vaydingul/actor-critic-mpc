@@ -40,7 +40,7 @@ def render_frame(
 ):
     TEXT_SIZE = 10
 
-    canvas = pygame.Surface((window_size, window_size))
+    canvas = pygame.Surface((window_size, window_size), pygame.SRCALPHA)
     canvas.fill((255, 255, 255))
 
     distance = np.linalg.norm(agent_location_original - target_location_original, ord=2)
@@ -84,7 +84,7 @@ def render_frame(
         agent_velocity_noisy = scale_vector(agent_velocity_noisy, size, window_size)
         pygame.draw.line(
             canvas,
-            (255, 0, 0, 100),
+            (255, 0, 0, 10),
             agent_location_noisy,
             (
                 agent_location_noisy[0] + agent_velocity_noisy[0],
@@ -120,7 +120,7 @@ def render_frame(
         target_location_noisy = scale_vector(target_location_noisy, size, window_size)
         target_size = scale_size(0.4, size, window_size)
         pygame.draw.circle(
-            canvas, (0, 0, 255, 100), target_location_noisy, target_size, width=0
+            canvas, (0, 0, 255, 10), target_location_noisy, target_size, width=0
         )
 
     # Put text TARGET on top of the target.
