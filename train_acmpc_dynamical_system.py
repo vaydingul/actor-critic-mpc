@@ -39,10 +39,6 @@ def main():
         prediction_horizon=2,
         size=size,
         lr=2.0,
-        agent_location_noise_level=agent_location_noise_level,
-        agent_velocity_noise_level=agent_velocity_noise_level,
-        target_location_noise_level=target_location_noise_level,
-        target_velocity_noise_level=target_velocity_noise_level,
         num_optimization_step=2,
     )
 

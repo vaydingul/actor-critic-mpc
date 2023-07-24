@@ -119,10 +119,6 @@ def main(args):
         num_optimization_step=num_optimization_step,
         size=size,
         lr=lr,
-        agent_location_noise_level=agent_location_noise_level,
-        agent_velocity_noise_level=agent_velocity_noise_level,
-        target_location_noise_level=target_location_noise_level,
-        target_velocity_noise_level=target_velocity_noise_level,
         device=device,
     )
 
@@ -185,7 +181,7 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=batch_size,
         batch_size=batch_size,
-        tensorboard_log="tensorboard_logs/",
+        tensorboard_log="tensorboard_logs_multienv/",
         device=device,
     )
 

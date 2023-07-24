@@ -46,12 +46,6 @@ class ModelPredictiveControl(nn.Module):
         lr=1e-2,
         size=10,
         window_size=512,
-        agent_location_noise_level=0.05,
-        agent_velocity_noise_level=0.05,
-        target_location_noise_level=0.05,
-        target_velocity_noise_level=0.05,
-        location_weight=0.0,
-        force_change_weight=0.0,
     ) -> None:
         super(ModelPredictiveControl, self).__init__()
         self.system = system
@@ -62,10 +56,6 @@ class ModelPredictiveControl(nn.Module):
         self.lr = lr
         self.size = size
         self.window_size = window_size
-        self.agent_location_noise_level = agent_location_noise_level
-        self.agent_velocity_noise_level = agent_velocity_noise_level
-        self.target_location_noise_level = target_location_noise_level
-        self.target_velocity_noise_level = target_velocity_noise_level
 
     def forward(
         self,
@@ -85,24 +75,10 @@ class ModelPredictiveControl(nn.Module):
 
         self.reset(action_initial=action_initial)
 
-        self._agent_location_original = agent_location
-        self._agent_velocity_original = agent_velocity
-        self._target_location_original = target_location
-        self._target_velocity_original = target_velocity
-
-        # Add noise to the observation
-        self._agent_location = agent_location + (
-            torch.randn_like(agent_location) * self.agent_location_noise_level
-        )
-        self._agent_velocity = agent_velocity + (
-            torch.randn_like(agent_velocity) * self.agent_velocity_noise_level
-        )
-        self._target_location = target_location + (
-            torch.randn_like(target_location) * self.target_location_noise_level
-        )
-        self._target_velocity = target_velocity + (
-            torch.randn_like(target_velocity) * self.target_velocity_noise_level
-        )
+        self._agent_location = agent_location
+        self._agent_velocity = agent_velocity
+        self._target_location = target_location
+        self._target_velocity = target_velocity
 
         return self._optimize(
             agent_location=self._agent_location,
@@ -235,10 +211,6 @@ class ModelPredictiveControlSimple(nn.Module):
         num_optimization_step=40,
         lr=1e-2,
         size=10,
-        agent_location_noise_level=0.05,
-        agent_velocity_noise_level=0.05,
-        target_location_noise_level=0.05,
-        target_velocity_noise_level=0.05,
         device="cuda",
     ) -> None:
         super(ModelPredictiveControlSimple, self).__init__()
@@ -248,10 +220,7 @@ class ModelPredictiveControlSimple(nn.Module):
         self.num_optimization_step = num_optimization_step
         self.lr = lr
         self.size = size
-        self.agent_location_noise_level = agent_location_noise_level
-        self.agent_velocity_noise_level = agent_velocity_noise_level
-        self.target_location_noise_level = target_location_noise_level
-        self.target_velocity_noise_level = target_velocity_noise_level
+
         self.device = device
 
     def forward(
@@ -270,24 +239,10 @@ class ModelPredictiveControlSimple(nn.Module):
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         torch.Tensor: The action tensor. The shape of the tensor is (batch_size, action_size).
         """
 
-        self._agent_location_original = agent_location
-        self._agent_velocity_original = agent_velocity
-        self._target_location_original = target_location
-        self._target_velocity_original = target_velocity
-
-        # Add noise to the observation
-        self._agent_location = agent_location + (
-            torch.randn_like(agent_location) * self.agent_location_noise_level
-        )
-        self._agent_velocity = agent_velocity + (
-            torch.randn_like(agent_velocity) * self.agent_velocity_noise_level
-        )
-        self._target_location = target_location + (
-            torch.randn_like(target_location) * self.target_location_noise_level
-        )
-        self._target_velocity = target_velocity + (
-            torch.randn_like(target_velocity) * self.target_velocity_noise_level
-        )
+        self._agent_location = agent_location
+        self._agent_velocity = agent_velocity
+        self._target_location = target_location
+        self._target_velocity = target_velocity
 
         return self._optimize(
             agent_location=self._agent_location,

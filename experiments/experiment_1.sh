@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-name="ppo+vanilla|no_noise|no_wind"
+name="models_new/ppo+vanilla|no_noise|no_wind"
 
-python train_acmpc_dynamical_system_args.py \
+python train_acmpc_multienv_dynamical_system_args.py \
+	--n_envs=40 \
 	--size=20 \
 	--batch_size=2048 \
 	--device="cuda" \
