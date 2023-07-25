@@ -178,7 +178,7 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=batch_size,
         batch_size=batch_size,
-        tensorboard_log="tensorboard_logs_multienv/",
+        tensorboard_log="tensorboard_logs_single_env_100000/",
         device=device,
     )
 

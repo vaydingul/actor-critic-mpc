@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-name="models_single_env/ppo+vanilla|no_noise|wind"
+name="models_new/ppo+vanilla|no_noise|no_wind"
 
 python train_acmpc_multienv_dynamical_system_args.py \
-	--n_envs=1 \
+	--n_envs=40 \
 	--size=20 \
 	--batch_size=2048 \
 	--device="cuda" \
@@ -15,8 +15,8 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--random_force_probability=0.0 \
 	--random_force_magnitude=0.0 \
 	--friction_coefficient=0.25 \
-	--wind_gust_x=0.5 \
-	--wind_gust_y=0.5 \
+	--wind_gust_x=0.0 \
+	--wind_gust_y=0.0 \
 	--wind_gust_region_x_min=0.3 \
 	--wind_gust_region_x_max=0.7 \
 	--wind_gust_region_y_min=0.3 \
@@ -29,6 +29,6 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--predict_action=True \
 	--predict_cost=False \
 	--num_cost_terms=2 \
-	--total_timesteps=100000 \
+	--total_timesteps=1000000 \
 	--tb_log_name="$name" \
 	--save_name="$name"

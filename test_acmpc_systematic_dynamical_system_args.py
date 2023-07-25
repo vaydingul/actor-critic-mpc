@@ -70,7 +70,7 @@ def main(args):
     # Create environment
     env = gym.make(
         "DynamicalSystem-v0",
-        render_mode="human",
+        render_mode=None,
         size=size,
         window_size=window_size,
         distance_threshold=distance_threshold,
@@ -83,6 +83,7 @@ def main(args):
     env = RelativeRedundant(env)
 
     results_dict = dict()
+    results_dict["model"] = ["mean_reward", "std_reward", "mean_length", "std_length"]
 
     for file in glob(models_path + "*.zip"):
 
@@ -90,12 +91,12 @@ def main(args):
         try:
             # Create model
             model = PPO.load(file, device=device)
-
+            print(f"Loaded model {file}")
         except:
             print(f"Failed to load model {file}")
             continue
         # Evaluate model
-        mean_reward, std_reward = evaluate_policy(
+        episode_rewards, episode_lengths = evaluate_policy(
             model,
             env,
             n_eval_episodes=num_episodes,
@@ -103,14 +104,18 @@ def main(args):
             render=False,
             callback=None,
             reward_threshold=None,
-            return_episode_rewards=False,
+            return_episode_rewards=True,
         )
-
-        results_dict[file] = [mean_reward, std_reward]
+        mean_reward = np.mean(episode_rewards)
+        std_reward = np.std(episode_rewards)
+        mean_length = np.mean(episode_lengths)
+        std_length = np.std(episode_lengths)
+        results_dict[file] = [mean_reward, std_reward, mean_length, std_length]
 
     # Save via pandas
     results_df = pd.DataFrame.from_dict(results_dict, orient="index")
     results_df.to_csv(evaluation_name + ".csv")
+
 
 
 if __name__ == "__main__":
@@ -118,8 +123,8 @@ if __name__ == "__main__":
     argprs.add_argument("--size", type=int, default=20)
     argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument("--models_path", type=str, default="models_new/")
-    argprs.add_argument("--evaluation_name", type=str, default="high_noise_high_wind")
-    argprs.add_argument("--num_episodes", type=int, default=1)
+    argprs.add_argument("--evaluation_name", type=str, default="high_noise_high_wind_models_new")
+    argprs.add_argument("--num_episodes", type=int, default=100)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.5)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.1)
     argprs.add_argument("--target_location_noise_level", type=float, default=0.5)

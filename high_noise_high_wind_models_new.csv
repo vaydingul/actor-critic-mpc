@@ -1,0 +1,12 @@
+,0,1,2,3
+model,mean_reward,std_reward,mean_length,std_length
+models_new/ppo+mpc|noise|no_wind|1|1.zip,31.0,90.21640649017229,99.35,130.81898753621357
+models_new/ppo+vanilla|noise|no_wind.zip,43.0,89.72736483370053,80.71,84.38060144369676
+models_new/ppo+mpc|no_noise|wind|2|2.zip,21.0,91.97282207261013,119.57,141.4492315284887
+models_new/ppo+mpc|noise|no_wind|2|2.zip,32.0,89.30845424706443,112.8,140.56770610634578
+models_new/ppo+mpc|no_noise|no_wind|2|2.zip,45.0,88.74119674649424,75.36,65.07972341674478
+models_new/ppo+mpc|no_noise|no_wind|5|5.zip,23.0,91.49316914393118,93.33,116.85607001777872
+models_new/ppo+mpc|no_noise|no_wind|1|1.zip,52.0,83.04215796810678,89.45,100.42493465270466
+models_new/ppo+mpc|no_noise|wind|1|1.zip,37.0,89.05616205518852,107.4,118.19466993058529
+models_new/ppo+vanilla|no_noise|no_wind.zip,31.0,92.40670971309389,90.0,105.8086007846243
+models_new/ppo+vanilla|no_noise|wind.zip,37.0,87.92610533851708,106.26,124.40680206483889

@@ -1,0 +1,4 @@
+,0,1,2,3
+model,mean_reward,std_reward,mean_length,std_length
+models_dummy/ppo+mpc|no_noise|no_wind|1|1.zip,0.0,100.0,119.0,71.0
+models_dummy/ppo+vanilla|no_noise|no_wind.zip,100.0,0.0,189.5,102.5

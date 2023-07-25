@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-name="models_new/ppo+mpc|no_noise|no_wind|2|2|cost"
+name="models_new/ppo+mpc|no_noise|no_wind|1|1"
 
 python train_acmpc_multienv_dynamical_system_args.py \
 	--n_envs=40 \
 	--size=20 \
 	--batch_size=2048 \
-	--device="cpu" \
+	--device="cuda" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.00 \
 	--target_location_noise_level=0.0 \
@@ -22,12 +22,12 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--wind_gust_region_y_min=0.3 \
 	--wind_gust_region_y_max=0.7 \
 	--action_size=2 \
-	--prediction_horizon=2 \
-	--num_optimization_step=2 \
-	--lr=5.0 \
+	--prediction_horizon=1 \
+	--num_optimization_step=1 \
+	--lr=2.0 \
 	--distance_threshold=1.0 \
-	--predict_action=False \
-	--predict_cost=True \
+	--predict_action=True \
+	--predict_cost=False \
 	--num_cost_terms=2 \
 	--total_timesteps=1000000 \
 	--tb_log_name="$name" \

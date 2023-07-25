@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-name="models_new/ppo+mpc|no_noise|wind|5|5"
+name="models_single_env/ppo+mpc|no_noise|wind|5|5"
 
 python train_acmpc_multienv_dynamical_system_args.py \
-	--n_envs=40 \
+	--n_envs=1 \
 	--size=20 \
 	--batch_size=2048 \
 	--device="cuda" \
@@ -29,6 +29,6 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--predict_action=True \
 	--predict_cost=False \
 	--num_cost_terms=2 \
-	--total_timesteps=1000000 \
+	--total_timesteps=100000 \
 	--tb_log_name="$name" \
 	--save_name="$name"
