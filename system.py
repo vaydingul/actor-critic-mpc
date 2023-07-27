@@ -32,9 +32,12 @@ class DynamicalSystem(nn.Module):
         self.device = device
         self._TORCH = False
 
-    def forward(
-        self, agent_location, agent_velocity, target_location, target_velocity, action
-    ):
+    def forward(self, state, action):
+        agent_location = state["agent_location"]
+        agent_velocity = state["agent_velocity"]
+        target_location = state["target_location"]
+        target_velocity = state["target_velocity"]
+
         self._TORCH = isinstance(agent_location, torch.Tensor)
 
         if self._TORCH:
@@ -118,7 +121,15 @@ class DynamicalSystem(nn.Module):
         _target_velocity = target_velocity + _acceleration * self.dt
         _target_location = target_location + target_velocity * self.dt
 
-        return _agent_location, _agent_velocity, _target_location, _target_velocity
+        # Return the new state
+        next_state = dict(
+            agent_location=_agent_location,
+            agent_velocity=_agent_velocity,
+            target_location=_target_location,
+            target_velocity=_target_velocity,
+        )
+
+        return next_state
 
     def _normalize(self, vector, norm=2, eps=1e-12):
         if self._TORCH:

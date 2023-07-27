@@ -111,18 +111,22 @@ class DynamicalSystemEnvironment(gym.Env):
     def step(self, action: np.ndarray) -> tuple[Any, float, bool, dict[str, Any]]:
         self._action = action
 
-        (
-            _agent_location,
-            _agent_velocity,
-            _target_location,
-            _target_velocity,
-        ) = self.system(
-            self._agent_location_original,
-            self._agent_velocity_original,
-            self._target_location_original,
-            self._target_velocity_original,
+        state = dict(
+            agent_location=self._agent_location_original,
+            agent_velocity=self._agent_velocity_original,
+            target_location=self._target_location_original,
+            target_velocity=self._target_velocity_original,
+        )
+
+        next_state = self.system(
+            state,
             action,
         )
+
+        _agent_location = next_state["agent_location"]
+        _agent_velocity = next_state["agent_velocity"]
+        _target_location = next_state["target_location"]
+        _target_velocity = next_state["target_velocity"]
 
         # Real states
         self._agent_location_original = _agent_location.copy()

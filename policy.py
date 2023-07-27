@@ -85,6 +85,7 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
         predict_action: bool = False,
         predict_cost: bool = False,
         num_cost_terms: int = 1,
+        obs_to_state_target: Optional[function] = None,
         last_layer_dim_pi: int = 64,
         last_layer_dim_vf: int = 64,
     ):
@@ -97,6 +98,7 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
         self.predict_action = predict_action
         self.predict_cost = predict_cost
         self.num_cost_terms = num_cost_terms
+        self.obs_to_state_target = obs_to_state_target
 
         # IMPORTANT:
         # Save output dimensions, used to create the distributions
@@ -111,7 +113,9 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(
                 last_layer_dim_pi,
-                action_dim * prediction_horizon if predict_action else num_cost_terms * prediction_horizon,
+                action_dim * prediction_horizon
+                if predict_action
+                else num_cost_terms * prediction_horizon,
             ),
             nn.Tanh(),
         )
@@ -139,10 +143,8 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
 
     def forward_actor(self, features: th.Tensor, obs: th.Tensor) -> th.Tensor:
         # Defactorize obs
-        agent_location = obs[..., 4:6]
-        agent_velocity = obs[..., 6:8]
-        target_location = obs[..., 8:10]
-        target_velocity = obs[..., 10:12]
+
+        state, target = self.obs_to_state_target(obs)
 
         with th.enable_grad():
             policy_net_output = self.policy_net(features)
@@ -153,16 +155,19 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                 )
 
                 action_mpc, _ = self.policy_net_mpc(
-                    agent_location,
-                    agent_velocity,
-                    target_location,
-                    target_velocity,
+                    state,
+                    target,
                     action_initial,
                     None,
                 )
 
             else:
-                cost_weights = policy_net_output.view((-1, self.prediction_horizon, self.num_cost_terms)) * 10
+                cost_weights = (
+                    policy_net_output.view(
+                        (-1, self.prediction_horizon, self.num_cost_terms)
+                    )
+                    * 10
+                )
                 cost_dict = {
                     "location_weight": cost_weights[..., 0],
                     "velocity_weight": cost_weights[..., 1],
@@ -195,6 +200,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         predict_action: bool = False,
         predict_cost: bool = False,
         num_cost_terms: int = 1,
+        obs_to_state_target: Optional[function] = None,
         *args,
         **kwargs,
     ):
@@ -204,6 +210,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         self.predict_action = predict_action
         self.predict_cost = predict_cost
         self.num_cost_terms = num_cost_terms
+        self.obs_to_state_target = obs_to_state_target
 
         # Disable orthogonal initialization
         kwargs["ortho_init"] = False
@@ -233,6 +240,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
             predict_action=self.predict_action,
             predict_cost=self.predict_cost,
             num_cost_terms=self.num_cost_terms,
+            obs_to_state_target=self.obs_to_state_target,
         )
 
     def _build(self, lr_schedule: Schedule) -> None:
