@@ -111,8 +111,9 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(
                 last_layer_dim_pi,
-                action_dim * prediction_horizon if predict_action else num_cost_terms,
+                action_dim * prediction_horizon if predict_action else num_cost_terms * prediction_horizon,
             ),
+            nn.Tanh(),
         )
 
         # MPC head of policy network
@@ -161,7 +162,7 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                 )
 
             else:
-                cost_weights = policy_net_output.view((-1, self.num_cost_terms))
+                cost_weights = policy_net_output.view((-1, self.prediction_horizon, self.num_cost_terms)) * 10
                 cost_dict = {
                     "location_weight": cost_weights[..., 0],
                     "velocity_weight": cost_weights[..., 1],

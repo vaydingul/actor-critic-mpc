@@ -57,6 +57,7 @@ def main(args):
 
     size = args.size
     n_envs = args.n_envs
+    n_steps = args.n_steps
     batch_size = args.batch_size
     device = args.device
 
@@ -92,6 +93,7 @@ def main(args):
 
     # Learning parameters
     total_timesteps = args.total_timesteps
+    tb_log_folder = args.tb_log_folder
     tb_log_name = args.tb_log_name
     save_name = args.save_name
 
@@ -176,9 +178,9 @@ def main(args):
         env,
         verbose=2,
         policy_kwargs=policy_kwargs,
-        n_steps=batch_size,
+        n_steps=n_steps,
         batch_size=batch_size,
-        tensorboard_log="tensorboard_logs_single_env_100000/",
+        tensorboard_log=tb_log_folder,
         device=device,
     )
 
@@ -198,6 +200,7 @@ if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=10)
     argprs.add_argument("--n_envs", type=int, default=4)
+    argprs.add_argument("--n_steps", type=int, default=2048)
     argprs.add_argument("--batch_size", type=int, default=2048)
     argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
@@ -223,6 +226,7 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=100_000)
+    argprs.add_argument("--tb_log_folder", type=str, default="PPO_vanilla_size_10")
     argprs.add_argument("--tb_log_name", type=str, default="PPO_vanilla_size_10")
     argprs.add_argument("--save_name", type=str, default="PPO_vanilla_size_10")
 

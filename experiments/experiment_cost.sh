@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
-name="models_single_env/ppo+mpc|no_noise|no_wind|10|10"
+name="ppo+mpc|no_noise|no_wind|2|2|cost"
 
 python train_acmpc_multienv_dynamical_system_args.py \
 	--n_envs=40 \
 	--size=20 \
-	--n_steps=2048 \
-	--batch_size=64 \
-	--device="cuda" \
+	--batch_size=256 \
+	--device="cpu" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.0 \
 	--target_location_noise_level=0.0 \
@@ -23,14 +22,13 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--wind_gust_region_y_min=0.3 \
 	--wind_gust_region_y_max=0.7 \
 	--action_size=2 \
-	--prediction_horizon=10 \
-	--num_optimization_step=10 \
+	--prediction_horizon=2 \
+	--num_optimization_step=2 \
 	--lr=2.0 \
 	--distance_threshold=1.0 \
-	--predict_action=True \
-	--predict_cost=False \
+	--predict_action=False \
+	--predict_cost=True \
 	--num_cost_terms=2 \
-	--total_timesteps=100000 \
-	--tb_log_folder="tensorboard_logs_experiment" \
+	--total_timesteps=1000000 \
 	--tb_log_name="$name" \
 	--save_name="$name"

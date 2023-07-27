@@ -1,0 +1,14 @@
+,0,1,2,3
+model,mean_reward,std_reward,mean_length,std_length
+models_single_env/ppo+mpc|noise|no_wind|5|5.zip,42.0,90.75241043630741,45.55,14.089978708287674
+models_single_env/ppo+mpc|no_noise|wind|5|5.zip,55.0,82.915619758885,47.03,16.66220573633635
+models_single_env/ppo+mpc|noise|no_wind|1|1.zip,-35.0,89.86100377805714,96.86,116.13190948227792
+models_single_env/ppo+vanilla|noise|no_wind.zip,-19.0,91.31812525451889,123.32,153.17792791391324
+models_single_env/ppo+mpc|no_noise|wind|2|2.zip,-8.0,94.53041838477179,102.47,132.76878059242694
+models_single_env/ppo+mpc|noise|no_wind|2|2.zip,-7.0,91.92932067626738,131.08,161.91044932307486
+models_single_env/ppo+mpc|no_noise|no_wind|2|2.zip,-7.0,95.1367436903324,101.24,128.60778514537913
+models_single_env/ppo+mpc|no_noise|no_wind|5|5.zip,62.0,78.46018098373213,46.43,14.98749812343608
+models_single_env/ppo+mpc|no_noise|no_wind|1|1.zip,-7.0,93.01075206662937,112.61,144.84280410155003
+models_single_env/ppo+mpc|no_noise|wind|1|1.zip,3.0,96.38983348880731,99.91,125.11403558354274
+models_single_env/ppo+vanilla|no_noise|no_wind.zip,5.0,94.20721840708386,105.45,135.75937352536656
+models_single_env/ppo+vanilla|no_noise|wind.zip,0.0,94.86832980505137,111.61,135.08959212315358

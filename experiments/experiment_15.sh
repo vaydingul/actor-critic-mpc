@@ -3,9 +3,9 @@
 name="models_single_env/ppo+mpc|no_noise|wind|10|10"
 
 python train_acmpc_multienv_dynamical_system_args.py \
-	--n_envs=1 \
+	--n_envs=40 \
 	--size=20 \
-	--batch_size=2048 \
+	--batch_size=64 \
 	--device="cuda" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.0 \

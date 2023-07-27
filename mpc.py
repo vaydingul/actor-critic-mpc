@@ -382,14 +382,14 @@ class ModelPredictiveControlSimple(nn.Module):
             }
 
         # Calculate the distance
-        location_loss = torch.norm(agent_location - target_location, 2, -1).mean(dim=1)
-        velocity_loss = torch.norm(agent_velocity - target_velocity, 2, -1).mean(dim=1)
+        location_loss = torch.norm(agent_location - target_location, 2, -1)
+        velocity_loss = torch.norm(agent_velocity - target_velocity, 2, -1)
 
-        # action_loss = self.action.sum(dim=1)
 
-        loss = (location_loss * cost_dict["location_weight"]).mean() + (
+
+        loss = (location_loss * cost_dict["location_weight"]).mean(dim=1).sum() + (
             velocity_loss * cost_dict["velocity_weight"]
-        ).mean()
+        ).mean(dim=1).sum()
 
         return loss
 
