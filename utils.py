@@ -274,9 +274,10 @@ def render_frame(
         )
         text_rect = text.get_rect()
         text_rect.center = (
-            (wind_gust_region_x_lower + wind_gust_region_x_upper) / 2,
-            (wind_gust_region_y_lower + wind_gust_region_y_upper) / 2,
+            wind_gust_region_rect[0] + wind_gust_region_rect[2] / 2,
+            wind_gust_region_rect[1] + wind_gust_region_rect[3] / 2,
         )
+        
         canvas.blit(text, text_rect)
     return canvas
 

@@ -18,7 +18,7 @@ from stable_baselines3.common.distributions import (
     StateDependentNoiseDistribution,
 )
 from stable_baselines3.common.type_aliases import Schedule, MaybeCallback
-from mpc import DistributionalModelPredictiveControlSimple, ModelPredictiveControlSimple
+from mpc import ModelPredictiveControlWithoutOptimizer
 
 
 class ActorCriticModelPredictiveControlFeatureExtractor(BaseFeaturesExtractor):
@@ -79,13 +79,15 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
         self,
         feature_dim: int,
         action_dim: int,
-        mpc_class: Type[ModelPredictiveControlSimple] = ModelPredictiveControlSimple,
+        mpc_class: Type[
+            ModelPredictiveControlWithoutOptimizer
+        ] = ModelPredictiveControlWithoutOptimizer,
         mpc_kwargs: Optional[Dict[str, Any]] = None,
         prediction_horizon: int = 10,
         predict_action: bool = False,
         predict_cost: bool = False,
         num_cost_terms: int = 1,
-        obs_to_state_target: Optional[function] = None,
+        obs_to_state_target: Optional[Callable] = None,
         last_layer_dim_pi: int = 64,
         last_layer_dim_vf: int = 64,
     ):
@@ -173,10 +175,8 @@ class ActorCriticModelPredictiveControlNetwork(nn.Module):
                     "velocity_weight": cost_weights[..., 1],
                 }
                 action_mpc, _ = self.policy_net_mpc(
-                    agent_location,
-                    agent_velocity,
-                    target_location,
-                    target_velocity,
+                    state,
+                    target,
                     None,
                     cost_dict,
                 )
@@ -194,13 +194,13 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         action_space: spaces.Space,
         lr_schedule: Callable[[float], float],
         mpc_class: Type[
-            DistributionalModelPredictiveControlSimple
-        ] = DistributionalModelPredictiveControlSimple,
+            ModelPredictiveControlWithoutOptimizer
+        ] = ModelPredictiveControlWithoutOptimizer,
         mpc_kwargs: Optional[Dict[str, Any]] = None,
         predict_action: bool = False,
         predict_cost: bool = False,
         num_cost_terms: int = 1,
-        obs_to_state_target: Optional[function] = None,
+        obs_to_state_target: Optional[Callable] = None,
         *args,
         **kwargs,
     ):

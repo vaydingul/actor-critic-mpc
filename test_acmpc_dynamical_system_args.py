@@ -1,16 +1,10 @@
 import env
 from argparse import ArgumentParser
-from policy import (
-    ActorCriticModelPredictiveControlPolicy,
-    ActorCriticModelPredictiveControlFeatureExtractor,
-)
 import gymnasium as gym
 import numpy as np
-from gymnasium.wrappers import FlattenObservation
-from wrapper import RelativePosition, RelativeRedundant
+from wrapper import RelativeRedundant
 from stable_baselines3 import PPO
 from system import DynamicalSystem
-from mpc import ModelPredictiveControlSimple, DistributionalModelPredictiveControlSimple
 
 WINDOW_SIZE = 512
 
@@ -95,11 +89,9 @@ def main(args):
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
-    argprs.add_argument("--size", type=int, default=20)
+    argprs.add_argument("--size", type=int, default=10)
     argprs.add_argument("--device", type=str, default="cpu")
-    argprs.add_argument(
-        "--model_name", type=str, default="ppo+mpc|no_noise|no_wind|2|2|cost.zip"
-    )
+    argprs.add_argument("--model_name", type=str, default="model")
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.0)
     argprs.add_argument("--target_location_noise_level", type=float, default=0.0)
@@ -108,8 +100,8 @@ if __name__ == "__main__":
     argprs.add_argument("--random_force_probability", type=float, default=0.001)
     argprs.add_argument("--random_force_magnitude", type=float, default=10.0)
     argprs.add_argument("--friction_coefficient", type=float, default=0.25)
-    argprs.add_argument("--wind_gust_x", type=float, default=0.0)
-    argprs.add_argument("--wind_gust_y", type=float, default=0.0)
+    argprs.add_argument("--wind_gust_x", type=float, default=0.5)
+    argprs.add_argument("--wind_gust_y", type=float, default=-0.5)
     argprs.add_argument("--wind_gust_region_x_min", type=float, default=0.2)
     argprs.add_argument("--wind_gust_region_x_max", type=float, default=0.8)
     argprs.add_argument("--wind_gust_region_y_min", type=float, default=0.2)
