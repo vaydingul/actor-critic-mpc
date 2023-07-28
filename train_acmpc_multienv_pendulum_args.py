@@ -222,9 +222,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=4)
-    argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=4 * 256)
+    argprs.add_argument("--n_envs", type=int, default=16)
+    argprs.add_argument("--n_steps", type=int, default=128)
+    argprs.add_argument("--batch_size", type=int, default=16 * 128)
     argprs.add_argument("--device", type=str, default="cpu")
 
     argprs.add_argument("--dt", type=float, default=0.05)
