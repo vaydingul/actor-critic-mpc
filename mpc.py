@@ -107,6 +107,8 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         else:
             self.action = action_initial.clone()
 
+        # self.action.register_hook(lambda grad: print(grad))
+
     def _predict(self, state: dict) -> torch.Tensor:
         predicted_state_ = list()
 

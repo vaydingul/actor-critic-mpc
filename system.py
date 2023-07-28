@@ -136,3 +136,54 @@ class DynamicalSystem(nn.Module):
             return torch.nn.functional.normalize(vector, norm, -1, eps)
         else:
             return vector / (np.linalg.norm(vector, norm, -1, True) + eps)
+
+
+class Pendulum(nn.Module):
+    def __init__(
+        self, dt: float = 0.05, m: float = 1.0, l: float = 1.0, g: float = 10.0
+    ) -> None:
+        super(Pendulum, self).__init__()
+
+        self.dt = dt
+        self.m = m
+        self.l = l
+        self.g = g
+
+        self.max_speed = 8
+        self.max_torque = 2.0
+
+        self._TORCH = False
+
+    def forward(self, state, action):
+        theta = state["theta"]
+        theta_dot = state["theta_dot"]
+
+        self._TORCH = isinstance(theta, torch.Tensor)
+
+        if self._TORCH:
+            clip = torch.clip
+            sin = torch.sin
+        else:
+            clip = np.clip
+            sin = np.sin
+
+        g = self.g
+        m = self.m
+        l = self.l
+        dt = self.dt
+
+        u = clip(action, -self.max_torque, self.max_torque)[0]
+
+        new_theta_dot = (
+            theta_dot + (3 * g / (2 * l) * sin(theta) + 3.0 / (m * l**2) * u) * dt
+        )
+        new_theta_dot = clip(new_theta_dot, -self.max_speed, self.max_speed)
+        new_theta = theta + new_theta_dot * dt
+
+        next_state = dict(theta=new_theta, theta_dot=new_theta_dot)
+
+        return next_state
+
+
+def angle_normalize(x):
+    return ((x + np.pi) % (2 * np.pi)) - np.pi
