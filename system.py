@@ -80,6 +80,8 @@ class DynamicalSystem(nn.Module):
         _agent_velocity = agent_velocity + _acceleration * self.dt
         _agent_location = agent_location + agent_velocity * self.dt
 
+
+
         # Target propagation
 
         # Apply the wind gust
@@ -172,7 +174,7 @@ class Pendulum(nn.Module):
         l = self.l
         dt = self.dt
 
-        u = clip(action, -self.max_torque, self.max_torque)[0]
+        u = clip(action, -self.max_torque, self.max_torque)
 
         new_theta_dot = (
             theta_dot + (3 * g / (2 * l) * sin(theta) + 3.0 / (m * l**2) * u) * dt

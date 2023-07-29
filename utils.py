@@ -8,9 +8,9 @@ def make_observation_space(size):
     return spaces.Dict(
         {
             "agent_location": spaces.Box(0, size, shape=(2,), dtype=float),
-            "agent_velocity": spaces.Box(-0.001, 0.001, shape=(2,), dtype=float),
+            "agent_velocity": spaces.Box(-1.0, 1.0, shape=(2,), dtype=float),
             "target_location": spaces.Box(0, size, shape=(2,), dtype=float),
-            "target_velocity": spaces.Box(-0.001, 0.001, shape=(2,), dtype=float),
+            "target_velocity": spaces.Box(-1.0, 1.0, shape=(2,), dtype=float),
         }
     )
 
@@ -277,7 +277,7 @@ def render_frame(
             wind_gust_region_rect[0] + wind_gust_region_rect[2] / 2,
             wind_gust_region_rect[1] + wind_gust_region_rect[3] / 2,
         )
-        
+
         canvas.blit(text, text_rect)
     return canvas
 

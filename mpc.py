@@ -6,7 +6,7 @@ import utils
 
 from stable_baselines3.common.distributions import DiagGaussianDistribution
 
-from typing import Optional
+from typing import Optional, Tuple
 
 pygame.font.init()
 
@@ -59,7 +59,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         target_state: dict,
         action_initial: Optional[torch.Tensor] = None,
         cost_dict: Optional[dict] = None,
-    ) -> None:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Optimizes the model.
         """
@@ -118,6 +118,8 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 self.action[:, i],
             )
             predicted_state_.append(next_state)
+
+            state = next_state
 
         predicted_state = dict()
         elem = predicted_state_[0]

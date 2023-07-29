@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-name="models_new/ppo+mpc|no_noise|no_wind|10|10"
+name="dynamical_system_experiments/models_29_07_2023/ppo+mpc|no_noise|no_wind|10|10"
 
 python train_acmpc_multienv_dynamical_system_args.py \
-	--n_envs=40 \
+	--n_envs=32 \
 	--size=20 \
-	--batch_size=2048 \
-	--device="cuda" \
+	--batch_size=64 \
+	--device="cpu" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.0 \
 	--target_location_noise_level=0.0 \
@@ -29,6 +29,7 @@ python train_acmpc_multienv_dynamical_system_args.py \
 	--predict_action=True \
 	--predict_cost=False \
 	--num_cost_terms=2 \
-	--total_timesteps=1000000 \
+	--total_timesteps=100000 \
+	--tb_log_folder="dynamical_system_experiments/tensorboard_logs_29_07_2023/" \
 	--tb_log_name="$name" \
 	--save_name="$name"
