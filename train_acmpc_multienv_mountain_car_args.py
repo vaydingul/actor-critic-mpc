@@ -2,17 +2,15 @@ import env
 from argparse import ArgumentParser
 from policy import (
     ActorCriticModelPredictiveControlPolicy,
-    ActorCriticModelPredictiveControlFeatureExtractor,
 )
 import gymnasium as gym
-from wrapper import RelativeRedundant
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from system import Pendulum, angle_normalize
+from system import MountainCar
 from mpc import ModelPredictiveControlWithoutOptimizer
 from typing import Callable, Any
 
@@ -21,37 +19,37 @@ import torch
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
-    batch_size, prediction_horizon, _ = predicted_state["theta"].shape
-    device = predicted_state["theta"].device
+    batch_size, prediction_horizon, _ = predicted_state["position"].shape
+    device = predicted_state["position"].device
 
-    predicted_theta = predicted_state["theta"]
-    predicted_theta_dot = predicted_state["theta_dot"]
+    predicted_position = predicted_state["position"]
+    predicted_velocity = predicted_state["velocity"]
 
-    target_theta = target_state["theta"].unsqueeze(1)
-    target_theta_dot = target_state["theta_dot"].unsqueeze(1)
+    target_position = (
+        target_state["position"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    )
+    target_velocity = (
+        target_state["velocity"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    )
 
     if cost_dict is None:
         cost_dict = dict(
-            theta_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 10.0,
-            theta_dot_weight=torch.ones(
-                batch_size, prediction_horizon, 1, device=device
-            )
-            * 0.1,
+            position_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 1000.0,
+            velocity_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 0.0,
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.001,
+            * 0.000,
         )
-
-    cost = torch.tensor(0.0, device=device)
 
     cost = (
         (
             torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta),
-                angle_normalize(target_theta),
+                predicted_position,
+                target_position,
                 reduction="none",
             )
-            * cost_dict["theta_weight"]
+            * cost_dict["position_weight"]
         )
         .mean(1)
         .sum()
@@ -60,11 +58,11 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     cost += (
         (
             torch.nn.functional.mse_loss(
-                predicted_theta_dot,
-                target_theta_dot,
+                predicted_velocity,
+                target_velocity,
                 reduction="none",
             )
-            * cost_dict["theta_dot_weight"]
+            * cost_dict["velocity_weight"]
         )
         .mean(1)
         .sum()
@@ -88,17 +86,17 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
 
 
 def obs_to_state_target(obs) -> tuple[Any, Any]:
-    theta = torch.atan2(obs[:, 1], obs[:, 0]).unsqueeze(-1)
-    theta_dot = obs[:, 2].unsqueeze(-1)
+    position = obs[..., 0].unsqueeze(-1)
+    velocity = obs[..., 1].unsqueeze(-1)
 
     state = dict(
-        theta=theta,
-        theta_dot=theta_dot,
+        position=position,
+        velocity=velocity,
     )
 
     target = dict(
-        theta=torch.ones_like(theta) * 0,
-        theta_dot=torch.ones_like(theta_dot) * 0.0,
+        position=torch.ones_like(position) * 0.45,
+        velocity=torch.ones_like(velocity) * 0.0,
     )
 
     return state, target
@@ -143,10 +141,7 @@ def main(args):
     device = args.device
     seed = args.seed
     # System parameters
-    dt = args.dt
-    m = args.m
-    g = args.g
-    l = args.l
+    goal_velocity = args.goal_velocity
 
     # MPC parameters
     action_size = args.action_size
@@ -166,12 +161,7 @@ def main(args):
     save_name = args.save_name
 
     # Create system
-    system = Pendulum(
-        dt=dt,
-        m=m,
-        g=g,
-        l=l,
-    )
+    system = MountainCar(goal_velocity=goal_velocity)
 
     # Create Model Predictive Control model
     mpc_class = ModelPredictiveControlWithoutOptimizer
@@ -189,13 +179,12 @@ def main(args):
         make_env(
             rank=i,
             seed=seed,
-            id="Pendulum-v1",
+            id="MountainCarContinuous-v0",
             render_mode="rgb_array",
-            g=g,
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -222,9 +211,6 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=n_steps,
         batch_size=batch_size,
-        gamma=0.98,
-        learning_rate=1e-4,
-        max_grad_norm=0.2,
         tensorboard_log=tb_log_folder,
         device=device,
     )
@@ -249,23 +235,20 @@ if __name__ == "__main__":
     argprs.add_argument("--batch_size", type=int, default=8 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
-    argprs.add_argument("--dt", type=float, default=0.05)
-    argprs.add_argument("--m", type=float, default=1.0)
-    argprs.add_argument("--g", type=float, default=10.0)
-    argprs.add_argument("--l", type=float, default=1.0)
+    argprs.add_argument("--goal_velocity", type=float, default=0.00)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=6)
-    argprs.add_argument("--num_optimization_step", type=int, default=6)
+    argprs.add_argument("--prediction_horizon", type=int, default=10)
+    argprs.add_argument("--num_optimization_step", type=int, default=10)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="")
-    argprs.add_argument("--tb_log_name", type=str, default="")
-    argprs.add_argument("--save_name", type=str, default="")
+    argprs.add_argument("--tb_log_folder", type=str, default="dummy")
+    argprs.add_argument("--tb_log_name", type=str, default="pendulum_10_10")
+    argprs.add_argument("--save_name", type=str, default="dummy_models/pendulum_10_10")
 
     args = argprs.parse_args()
 

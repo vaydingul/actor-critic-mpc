@@ -99,10 +99,18 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         self, action_initial: Optional[torch.Tensor] = None, batch_size: int = 1
     ) -> None:
         if action_initial is None:
-            self.action = torch.zeros(
-                (batch_size, self.prediction_horizon, self.action_size),
-                device=self.device,
-                requires_grad=True,
+            # self.action = torch.zeros(
+            #     (batch_size, self.prediction_horizon, self.action_size),
+            #     device=self.device,
+            #     requires_grad=True,
+            # )
+            self.action = (
+                torch.randn(
+                    (batch_size, self.prediction_horizon, self.action_size),
+                    device=self.device,
+                    requires_grad=True,
+                )
+                * 0.3
             )
         else:
             self.action = action_initial.clone()

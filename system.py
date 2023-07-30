@@ -191,6 +191,7 @@ def angle_normalize(x):
 
 class MountainCar(nn.Module):
     def __init__(self, goal_velocity=0.0):
+        super(MountainCar, self).__init__()
         self.min_action = -1.0
         self.max_action = 1.0
         self.min_position = -1.2
@@ -202,5 +203,30 @@ class MountainCar(nn.Module):
         self.goal_velocity = goal_velocity
         self.power = 0.0015
 
-    def step(self, state, action):
-        pass
+        self._TORCH = False
+
+    def forward(self, state, action):
+        position = state["position"]
+        velocity = state["velocity"]
+
+        self._TORCH = isinstance(position, torch.Tensor)
+
+        if self._TORCH:
+            clip = torch.clip
+            cos = torch.cos
+        else:
+            clip = np.clip
+            cos = np.cos
+
+        force = clip(action, self.min_action, self.max_action)
+
+        next_velocity = velocity + force * self.power - 0.0025 * cos(3 * position)
+        next_velocity = clip(next_velocity, -self.max_speed, self.max_speed)
+
+        next_position = position + next_velocity
+        next_position = clip(next_position, self.min_position, self.max_position)
+
+        next_state = dict(position=next_position, velocity=next_velocity)
+
+        return next_state
+

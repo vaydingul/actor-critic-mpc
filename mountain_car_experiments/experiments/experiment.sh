@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-folder="pendulum_experiments"
-name_main="pendulum"
+folder="mountain_car_experiments"
+name_main="mountain_car"
 
 prediction_horizon_list=(1 1 2 3 4 5 6 7 8 9 10)
 num_optimization_step_list=(0 1 2 3 4 5 6 7 8 9 10)
@@ -21,7 +21,7 @@ for i in "${!prediction_horizon_list[@]}"; do
 	echo "Seed 1"
 
 	# Run the command
-	python train_acmpc_multienv_pendulum_args.py --seed 42 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs_new_lr/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models_new_lr/${name_main}_${name}_1"
+	python train_acmpc_multienv_mountain_car_args.py --seed 42 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models/${name_main}_${name}_1"
 
 	# Print the values
 	echo "$prediction_horizon"
@@ -30,5 +30,5 @@ for i in "${!prediction_horizon_list[@]}"; do
 	echo "Seed 2"
 
 	# Run the command
-	python train_acmpc_multienv_pendulum_args.py --seed 2023 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs_new_lr/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models_new_lr/${name_main}_${name}_2"
+	python train_acmpc_multienv_mountain_car_args.py --seed 2023 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models/${name_main}_${name}_2"
 done
