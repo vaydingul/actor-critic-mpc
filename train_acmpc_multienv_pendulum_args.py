@@ -44,24 +44,64 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
 
     cost = torch.tensor(0.0, device=device)
 
-    cost += (
+    # cost += (
+    #     (
+    #         ((angle_normalize(predicted_theta) - angle_normalize(target_theta)).pow(2))
+    #         * cost_dict["theta_weight"]
+    #     )
+    #     # .mean(1)
+    #     .sum()
+    # )
+    # cost += (
+    #     (
+    #         (predicted_theta_dot - target_theta_dot).pow(2)
+    #         * cost_dict["theta_dot_weight"]
+    #     )
+    #     # .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (action.pow(2) * cost_dict["action_weight"]).mean(1).sum()
+
+    cost = (
         (
-            ((angle_normalize(predicted_theta) - angle_normalize(target_theta)).pow(2))
+            torch.nn.functional.mse_loss(
+                angle_normalize(predicted_theta),
+                angle_normalize(target_theta),
+                reduction="none",
+            )
             * cost_dict["theta_weight"]
         )
-        # .mean(1)
-        .sum()
-    )
-    cost += (
-        (
-            (predicted_theta_dot - target_theta_dot).pow(2)
-            * cost_dict["theta_dot_weight"]
-        )
-        # .mean(1)
+        .mean(1)
         .sum()
     )
 
-    cost += (action.pow(2) * cost_dict["action_weight"]).mean(1).sum()
+    cost += (
+        (
+            torch.nn.functional.mse_loss(
+                predicted_theta_dot,
+                target_theta_dot,
+                reduction="none",
+            )
+            * cost_dict["theta_dot_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
+
+    cost += (
+        (
+            torch.norm(
+                action,
+                p=2,
+                dim=-1,
+                keepdim=True,
+            )
+            * cost_dict["action_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
 
     return cost
 
@@ -120,7 +160,7 @@ def main(args):
     n_steps = args.n_steps
     batch_size = args.batch_size
     device = args.device
-
+    seed = args.seed
     # System parameters
     dt = args.dt
     m = args.m
@@ -167,7 +207,7 @@ def main(args):
     env_list = [
         make_env(
             rank=i,
-            seed=0,
+            seed=seed,
             id="Pendulum-v1",
             render_mode="rgb_array",
             g=g,
@@ -226,7 +266,7 @@ if __name__ == "__main__":
     argprs.add_argument("--n_steps", type=int, default=128)
     argprs.add_argument("--batch_size", type=int, default=16 * 128)
     argprs.add_argument("--device", type=str, default="cpu")
-
+    argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--dt", type=float, default=0.05)
     argprs.add_argument("--m", type=float, default=1.0)
     argprs.add_argument("--g", type=float, default=10.0)
@@ -241,9 +281,9 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="")
-    argprs.add_argument("--tb_log_name", type=str, default="")
-    argprs.add_argument("--save_name", type=str, default="pendulum10-10")
+    argprs.add_argument("--tb_log_folder", type=str, default="dummy")
+    argprs.add_argument("--tb_log_name", type=str, default="pendulum_10_10")
+    argprs.add_argument("--save_name", type=str, default="dummy_models/pendulum_10_10")
 
     args = argprs.parse_args()
 

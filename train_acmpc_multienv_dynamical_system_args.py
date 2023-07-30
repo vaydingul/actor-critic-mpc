@@ -28,30 +28,30 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
 
     predicted_agent_location = predicted_state["agent_location"]
     predicted_agent_velocity = predicted_state["agent_velocity"]
-    # predicted_target_location = predicted_state["target_location"]
-    # predicted_target_velocity = predicted_state["target_velocity"]
+
     target_agent_location = target_state["agent_location"].unsqueeze(1)
     target_agent_velocity = target_state["agent_velocity"].unsqueeze(1)
-    # target_target_location = target_state["target_location"]
-    # target_target_velocity = target_state["target_velocity"]
 
     if cost_dict is None:
         cost_dict = dict(
-            location_weight=torch.ones(batch_size, prediction_horizon, device=device),
+            location_weight=torch.ones(batch_size, prediction_horizon, device=device)
+            * 1.0,
             velocity_weight=torch.ones(batch_size, prediction_horizon, device=device)
             * 0.1,
-            action_first_derivative_weight=torch.zeros(
+            action_first_derivative_weight=torch.ones(
                 batch_size, prediction_horizon - 1, device=device
-            ),
-            action_second_derivative_weight=torch.zeros(
+            )
+            * 0.0,
+            action_second_derivative_weight=torch.ones(
                 batch_size, prediction_horizon - 2, device=device
-            ),
+            )
+            * 0.0
+            if prediction_horizon > 2
+            else None,
         )
 
-    cost = torch.tensor(0.0, device=device)
-
     # Location cost
-    cost += (
+    cost = (
         (
             cost_dict["location_weight"]
             * torch.norm(predicted_agent_location - target_agent_location, p=2, dim=-1)
@@ -71,26 +71,26 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     )
 
     # Action first and second derivative cost
-    if action is not None:
-        action_first_derivative = torch.diff(action, dim=1)
-        cost += (
-            (
-                cost_dict["action_first_derivative_weight"]
-                * torch.norm(action_first_derivative, p=2, dim=-1)
-            )
-            .mean(dim=1)
-            .sum()
-        )
+    # if action is not None:
+    #     action_first_derivative = torch.diff(action, dim=1)
+    #     cost += (
+    #         (
+    #             cost_dict["action_first_derivative_weight"]
+    #             * torch.norm(action_first_derivative, p=2, dim=-1)
+    #         )
+    #         .mean(dim=1)
+    #         .sum()
+    #     )
 
-        action_second_derivative = torch.diff(action_first_derivative, dim=1)
-        cost += (
-            (
-                cost_dict["action_second_derivative_weight"]
-                * torch.norm(action_second_derivative, p=2, dim=-1)
-            )
-            .mean(dim=1)
-            .sum()
-        )
+    #     action_second_derivative = torch.diff(action_first_derivative, dim=1)
+    #     cost += (
+    #         (
+    #             cost_dict["action_second_derivative_weight"]
+    #             * torch.norm(action_second_derivative, p=2, dim=-1)
+    #         )
+    #         .mean(dim=1)
+    #         .sum()
+    #     )
 
     return cost
 

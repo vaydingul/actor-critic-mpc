@@ -17,11 +17,12 @@ model = PPO(
     batch_size=2048,
     n_steps=2048,
     verbose=1,
+    tensorboard_log="dummy",
 )
 
 
 # Train the agent
-model.learn(total_timesteps=int(1e6), progress_bar=True)
+model.learn(total_timesteps=int(1e6), progress_bar=True, tb_log_name="pendulum_ppo")
 
 # Fetch model
 vec_env = model.get_env()

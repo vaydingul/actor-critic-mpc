@@ -80,8 +80,6 @@ class DynamicalSystem(nn.Module):
         _agent_velocity = agent_velocity + _acceleration * self.dt
         _agent_location = agent_location + agent_velocity * self.dt
 
-
-
         # Target propagation
 
         # Apply the wind gust
@@ -189,3 +187,20 @@ class Pendulum(nn.Module):
 
 def angle_normalize(x):
     return ((x + np.pi) % (2 * np.pi)) - np.pi
+
+
+class MountainCar(nn.Module):
+    def __init__(self, goal_velocity=0.0):
+        self.min_action = -1.0
+        self.max_action = 1.0
+        self.min_position = -1.2
+        self.max_position = 0.6
+        self.max_speed = 0.07
+        self.goal_position = (
+            0.45  # was 0.5 in gymnasium, 0.45 in Arnaud de Broissia's version
+        )
+        self.goal_velocity = goal_velocity
+        self.power = 0.0015
+
+    def step(self, state, action):
+        pass

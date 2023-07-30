@@ -145,7 +145,7 @@ mpc = ModelPredictiveControlWithoutOptimizer(
     action_size=2,
     prediction_horizon=10,
     num_optimization_step=40,
-    lr=1.0,
+    lr=2.0,
     device="cpu",
 )
 

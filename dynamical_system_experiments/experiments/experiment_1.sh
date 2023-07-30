@@ -3,9 +3,9 @@
 name="dynamical_system_experiments/models_29_07_2023/ppo+vanilla|no_noise|no_wind"
 
 python train_acmpc_multienv_dynamical_system_args.py \
-	--n_envs=32 \
+	--n_envs=8 \
 	--size=20 \
-	--batch_size=64 \
+	--batch_size=256 \
 	--device="cpu" \
 	--agent_location_noise_level=0.0 \
 	--agent_velocity_noise_level=0.0 \
