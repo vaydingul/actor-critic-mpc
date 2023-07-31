@@ -115,7 +115,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 * self.std
             )
         else:
-            self.action = action_initial.clone()
+            self.action = action_initial
 
         # self.action.register_hook(lambda grad: print(grad))
 

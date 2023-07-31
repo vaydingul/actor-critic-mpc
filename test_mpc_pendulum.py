@@ -122,7 +122,7 @@ system = Pendulum(
 # Create environment
 env = make_vec_env(
     "Pendulum-v1",
-    n_envs=1,
+    n_envs=100,
     seed=42,
     env_kwargs=dict(
         g=10.0,

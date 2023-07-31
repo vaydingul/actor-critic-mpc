@@ -5,18 +5,17 @@ from policy import (
     ActorCriticModelPredictiveControlFeatureExtractor,
 )
 import gymnasium as gym
-from wrapper import RelativeRedundant
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from system import Pendulum, angle_normalize
 from mpc import ModelPredictiveControlWithoutOptimizer
 from typing import Callable, Any
 
-from torch import nn
+
 import torch
 
 
@@ -61,8 +60,6 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
         .sum()
     )
     cost += (((action).pow(2)) * cost_dict["action_weight"]).mean(1).sum()
-
-    # cost = torch.tensor(0.0, device=device)
 
     # cost = (
     #     (
@@ -215,7 +212,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -264,9 +261,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=4)
-    argprs.add_argument("--n_steps", type=int, default=512)
-    argprs.add_argument("--batch_size", type=int, default=4 * 512)
+    argprs.add_argument("--n_envs", type=int, default=8)
+    argprs.add_argument("--n_steps", type=int, default=128)
+    argprs.add_argument("--batch_size", type=int, default=8 * 128)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--dt", type=float, default=0.05)
@@ -275,8 +272,8 @@ if __name__ == "__main__":
     argprs.add_argument("--l", type=float, default=1.0)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=6)
-    argprs.add_argument("--num_optimization_step", type=int, default=6)
+    argprs.add_argument("--prediction_horizon", type=int, default=7)
+    argprs.add_argument("--num_optimization_step", type=int, default=7)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
@@ -285,7 +282,7 @@ if __name__ == "__main__":
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
     argprs.add_argument("--tb_log_folder", type=str, default="")
     argprs.add_argument("--tb_log_name", type=str, default="")
-    argprs.add_argument("--save_name", type=str, default="")
+    argprs.add_argument("--save_name", type=str, default="model")
 
     args = argprs.parse_args()
 
