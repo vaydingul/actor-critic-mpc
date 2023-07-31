@@ -20,6 +20,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         prediction_horizon: int = 10,
         num_optimization_step: int = 40,
         lr: float = 1e-2,
+        std: float = 0.3,
         device="cuda",
     ) -> None:
         super(ModelPredictiveControlWithoutOptimizer, self).__init__()
@@ -29,6 +30,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         self.prediction_horizon = prediction_horizon
         self.num_optimization_step = num_optimization_step
         self.lr = lr
+        self.std = std
 
         self.device = device
 
@@ -110,7 +112,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                     device=self.device,
                     requires_grad=True,
                 )
-                * 0.3
+                * self.std
             )
         else:
             self.action = action_initial.clone()

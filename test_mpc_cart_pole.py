@@ -1,7 +1,10 @@
+import time
 from typing import Any
+
+import numpy as np
 import env
 from mpc import ModelPredictiveControlWithoutOptimizer
-from system import Pendulum, angle_normalize
+from system import CartPole
 
 # Import make_vec_env to allow parallelization
 from stable_baselines3.common.env_util import make_vec_env
@@ -9,12 +12,16 @@ import torch
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
-    batch_size, prediction_horizon, _ = predicted_state["theta"].shape
-    device = predicted_state["theta"].device
+    batch_size, prediction_horizon, _ = predicted_state["x"].shape
+    device = predicted_state["x"].device
 
+    predicted_x = predicted_state["x"]
+    predicted_x_dot = predicted_state["x_dot"]
     predicted_theta = predicted_state["theta"]
     predicted_theta_dot = predicted_state["theta_dot"]
 
+    target_x = target_state["x"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    target_x_dot = target_state["x_dot"].unsqueeze(1).expand(-1, prediction_horizon, -1)
     target_theta = target_state["theta"].unsqueeze(1).expand(-1, prediction_horizon, -1)
     target_theta_dot = (
         target_state["theta_dot"].unsqueeze(1).expand(-1, prediction_horizon, -1)
@@ -22,22 +29,31 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
 
     if cost_dict is None:
         cost_dict = dict(
+            x_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 01.0,
+            x_dot_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 0.0,
             theta_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 10.0,
+            * 100.0,
             theta_dot_weight=torch.ones(
                 batch_size, prediction_horizon, 1, device=device
             )
-            * 0.1,
+            * 0.0,
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.001,
+            * 0.0,
         )
 
+    # cost = (((predicted_x - target_x).pow(2)) * cost_dict["x_weight"]).mean(1).sum()
+
     # cost += (
-    #     (
-    #         ((angle_normalize(predicted_theta) - angle_normalize(target_theta)).pow(2))
-    #         * cost_dict["theta_weight"]
-    #     )
-    #     .mean(0)
+    #     ((predicted_x_dot - target_x_dot).pow(2) * cost_dict["x_dot_weight"])
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (((predicted_theta - target_theta).pow(2)) * cost_dict["theta_weight"])
+    #     .mean(1)
     #     .sum()
     # )
     # cost += (
@@ -45,17 +61,43 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     #         (predicted_theta_dot - target_theta_dot).pow(2)
     #         * cost_dict["theta_dot_weight"]
     #     )
-    #     .mean(0)
+    #     .mean(1)
     #     .sum()
     # )
 
-    # cost += (action.pow(2) * cost_dict["action_weight"]).mean(0).sum()
+    # cost += (action.pow(2) * cost_dict["action_weight"]).mean(1).sum()
 
     cost = (
         (
             torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta),
-                angle_normalize(target_theta),
+                predicted_x,
+                target_x,
+                reduction="none",
+            )
+            * cost_dict["x_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
+
+    cost += (
+        (
+            torch.nn.functional.mse_loss(
+                predicted_x_dot,
+                target_x_dot,
+                reduction="none",
+            )
+            * cost_dict["x_dot_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
+
+    cost += (
+        (
+            torch.nn.functional.mse_loss(
+                predicted_theta,
+                target_theta,
                 reduction="none",
             )
             * cost_dict["theta_weight"]
@@ -77,33 +119,27 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
         .sum()
     )
 
-    cost += (
-        (
-            torch.norm(
-                action,
-                p=2,
-                dim=-1,
-                keepdim=True,
-            )
-            * cost_dict["action_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
+    cost += (((action).pow(2)) * cost_dict["action_weight"]).mean(1).sum()
 
     return cost
 
 
 def obs_to_state_target(obs) -> tuple[Any, Any]:
-    theta = torch.atan2(obs[:, 1], obs[:, 0]).unsqueeze(-1)
-    theta_dot = obs[:, 2].unsqueeze(-1)
+    x = obs[:, 0].unsqueeze(1)
+    x_dot = obs[:, 1].unsqueeze(1)
+    theta = obs[:, 2].unsqueeze(1)
+    theta_dot = obs[:, 3].unsqueeze(1)
 
     state = dict(
+        x=x,
+        x_dot=x_dot,
         theta=theta,
         theta_dot=theta_dot,
     )
 
     target = dict(
+        x=torch.ones_like(x) * 0.0,
+        x_dot=torch.ones_like(x_dot) * 0.0,
         theta=torch.ones_like(theta) * 0.0,
         theta_dot=torch.ones_like(theta_dot) * 0.0,
     )
@@ -112,21 +148,13 @@ def obs_to_state_target(obs) -> tuple[Any, Any]:
 
 
 # Create system
-system = Pendulum(
-    dt=0.05,
-    m=1.0,
-    g=10.0,
-    l=1.0,
-)
+system = CartPole()
 
 # Create environment
 env = make_vec_env(
-    "Pendulum-v1",
+    "CartPoleContinuous-v0",
     n_envs=1,
     seed=42,
-    env_kwargs=dict(
-        g=10.0,
-    ),
 )
 
 
@@ -136,8 +164,9 @@ mpc = ModelPredictiveControlWithoutOptimizer(
     cost,
     action_size=1,
     prediction_horizon=10,
-    num_optimization_step=10,
+    num_optimization_step=100,
     lr=1.0,
+    std=2.5,
     device="cpu",
 )
 
@@ -148,23 +177,29 @@ observation = torch.Tensor(observation.copy())
 
 state, target = obs_to_state_target(observation)
 
-
+counter = 0
 while True:
     action, cost_value = mpc(state, target)
 
-    print(action)
-
     action_ = action.clone().detach().numpy()
     action_selected = action_[:, 0]
-    print(action_selected.shape)
+
     print(f"Action: {action_selected}")
     print(f"Cost: {cost_value}")
-    observation, reward, _, information = env.step(action_selected)
-    print(reward)
+    observation, reward, done, information = env.step(action_selected)
+
+    print(f"Reward: {reward}")
+
     observation = torch.Tensor(observation.copy())
 
     state, target = obs_to_state_target(observation)
 
+    counter += 1
+
+    print(f"Counter: {counter}")
+
+    if np.all(done):
+        counter = 0
 
     # time.sleep(0.1)
     env.render("human")

@@ -1,6 +1,7 @@
 from torch import nn
 import torch
 import numpy as np
+import math
 
 
 class DynamicalSystem(nn.Module):
@@ -230,3 +231,71 @@ class MountainCar(nn.Module):
 
         return next_state
 
+
+class CartPole(nn.Module):
+    def __init__(self):
+        super(CartPole, self).__init__()
+        self.gravity = 9.8
+        self.masscart = 1.0
+        self.masspole = 0.1
+        self.total_mass = self.masspole + self.masscart
+        self.length = 0.5  # actually half the pole's length
+        self.polemass_length = self.masspole * self.length
+        self.force_mag = 10.0
+        self.tau = 0.02  # seconds between state updates
+        self.kinematics_integrator = "euler"
+
+        # Angle at which to fail the episode
+        self.theta_threshold_radians = 12 * 2 * math.pi / 360
+        self.x_threshold = 2.4
+
+        self._TORCH = False
+
+    def forward(self, state, action):
+        x = state["x"]
+        x_dot = state["x_dot"]
+        theta = state["theta"]
+        theta_dot = state["theta_dot"]
+
+        self._TORCH = isinstance(x, torch.Tensor)
+
+        if self._TORCH:
+            clip = torch.clip
+            cos = torch.cos
+            sin = torch.sin
+        else:
+            clip = np.clip
+            cos = np.cos
+            sin = np.sin
+
+        force = clip(action, -self.force_mag, self.force_mag)
+
+        costheta = cos(theta)
+        sintheta = sin(theta)
+
+        # For the interested reader:
+        # https://coneural.org/florian/papers/05_cart_pole.pdf
+        temp = (
+            force + self.polemass_length * theta_dot**2 * sintheta
+        ) / self.total_mass
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (
+            self.length * (4.0 / 3.0 - self.masspole * costheta**2 / self.total_mass)
+        )
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+
+        if self.kinematics_integrator == "euler":
+            x_next = x + self.tau * x_dot
+            x_dot_next = x_dot + self.tau * xacc
+            theta_next = theta + self.tau * theta_dot
+            theta_dot_next = theta_dot + self.tau * thetaacc
+        else:  # semi-implicit euler
+            x_dot_next = x_dot + self.tau * xacc
+            x_next = x + self.tau * x_dot_next
+            theta_dot_next = theta_dot + self.tau * thetaacc
+            theta = theta + self.tau * theta_dot_next
+
+        next_state = dict(
+            x=x_next, x_dot=x_dot_next, theta=theta_next, theta_dot=theta_dot_next
+        )
+
+        return next_state

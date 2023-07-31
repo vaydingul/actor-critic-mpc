@@ -27,8 +27,10 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     predicted_theta = predicted_state["theta"]
     predicted_theta_dot = predicted_state["theta_dot"]
 
-    target_theta = target_state["theta"].unsqueeze(1)
-    target_theta_dot = target_state["theta_dot"].unsqueeze(1)
+    target_theta = target_state["theta"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    target_theta_dot = (
+        target_state["theta_dot"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    )
 
     if cost_dict is None:
         cost_dict = dict(
@@ -42,47 +44,65 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
             * 0.001,
         )
 
-    cost = torch.tensor(0.0, device=device)
-
     cost = (
         (
-            torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta),
-                angle_normalize(target_theta),
-                reduction="none",
-            )
+            ((angle_normalize(predicted_theta) - angle_normalize(target_theta)).pow(2))
             * cost_dict["theta_weight"]
         )
         .mean(1)
         .sum()
     )
-
     cost += (
         (
-            torch.nn.functional.mse_loss(
-                predicted_theta_dot,
-                target_theta_dot,
-                reduction="none",
-            )
+            ((predicted_theta_dot - target_theta_dot).pow(2))
             * cost_dict["theta_dot_weight"]
         )
         .mean(1)
         .sum()
     )
+    cost += (((action).pow(2)) * cost_dict["action_weight"]).mean(1).sum()
 
-    cost += (
-        (
-            torch.norm(
-                action,
-                p=2,
-                dim=-1,
-                keepdim=True,
-            )
-            * cost_dict["action_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
+    # cost = torch.tensor(0.0, device=device)
+
+    # cost = (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             angle_normalize(predicted_theta),
+    #             angle_normalize(target_theta),
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             predicted_theta_dot,
+    #             target_theta_dot,
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_dot_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (
+    #         torch.norm(
+    #             action,
+    #             p=2,
+    #             dim=-1,
+    #             keepdim=True,
+    #         )
+    #         * cost_dict["action_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
 
     return cost
 
@@ -244,9 +264,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=8)
-    argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=8 * 256)
+    argprs.add_argument("--n_envs", type=int, default=4)
+    argprs.add_argument("--n_steps", type=int, default=512)
+    argprs.add_argument("--batch_size", type=int, default=4 * 512)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--dt", type=float, default=0.05)
