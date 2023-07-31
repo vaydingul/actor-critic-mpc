@@ -199,6 +199,7 @@ def main(args):
         prediction_horizon=prediction_horizon,
         num_optimization_step=num_optimization_step,
         lr=lr,
+        std=0.6,
         device=device,
     )
 
