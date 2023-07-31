@@ -91,7 +91,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
             )[0]
 
             self.action = self.action - self.lr * action_grad
-            self.action.retain_grad()
+            # self.action.retain_grad()
 
         action = self.action  # .detach()
 
@@ -123,13 +123,11 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         predicted_state_ = list()
 
         for i in range(self.prediction_horizon):
-            (next_state) = self.system(
+            (state) = self.system(
                 state,
                 self.action[:, i],
             )
-            predicted_state_.append(next_state)
-
-            state = next_state
+            predicted_state_.append(state)
 
         predicted_state = dict()
         elem = predicted_state_[0]
