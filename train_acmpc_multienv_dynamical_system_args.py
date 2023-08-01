@@ -159,6 +159,7 @@ def main(args):
     n_steps = args.n_steps
     batch_size = args.batch_size
     device = args.device
+    seed = args.seed
 
     agent_location_noise_level = args.agent_location_noise_level
     agent_velocity_noise_level = args.agent_velocity_noise_level
@@ -217,6 +218,7 @@ def main(args):
         prediction_horizon=prediction_horizon,
         num_optimization_step=num_optimization_step,
         lr=lr,
+        std=2.5,
         device=device,
     )
 
@@ -224,9 +226,9 @@ def main(args):
     env_list = [
         make_env(
             rank=i,
-            seed=0,
+            seed=seed,
             id="DynamicalSystem-v0",
-            render_mode="rgb_array",
+            render_mode=None,
             size=size,
             window_size=window_size,
             distance_threshold=distance_threshold,
@@ -283,14 +285,15 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
-    argprs.add_argument("--n_envs", type=int, default=16)
-    argprs.add_argument("--n_steps", type=int, default=128)
-    argprs.add_argument("--batch_size", type=int, default=16 * 128)
+    argprs.add_argument("--n_envs", type=int, default=32)
+    argprs.add_argument("--n_steps", type=int, default=256)
+    argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
-    argprs.add_argument("--agent_location_noise_level", type=float, default=0.5)
-    argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.1)
-    argprs.add_argument("--target_location_noise_level", type=float, default=0.5)
-    argprs.add_argument("--target_velocity_noise_level", type=float, default=0.1)
+    argprs.add_argument("--seed", type=int, default=42)
+    argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
+    argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.0)
+    argprs.add_argument("--target_location_noise_level", type=float, default=0.0)
+    argprs.add_argument("--target_velocity_noise_level", type=float, default=0.0)
     argprs.add_argument("--dt", type=float, default=0.1)
     argprs.add_argument("--random_force_probability", type=float, default=0.0)
     argprs.add_argument("--random_force_magnitude", type=float, default=10.0)
@@ -305,11 +308,11 @@ if __name__ == "__main__":
     argprs.add_argument("--prediction_horizon", type=int, default=10)
     argprs.add_argument("--num_optimization_step", type=int, default=0)
     argprs.add_argument("--lr", type=float, default=2.0)
-    argprs.add_argument("--distance_threshold", type=float, default=1.0)
+    argprs.add_argument("--distance_threshold", type=float, default=0.5)
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
-    argprs.add_argument("--total_timesteps", type=int, default=100_000)
+    argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
     argprs.add_argument("--tb_log_folder", type=str, default="./")
     argprs.add_argument("--tb_log_name", type=str, default="vanilla")
     argprs.add_argument("--save_name", type=str, default="model")
