@@ -35,11 +35,11 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     if cost_dict is None:
         cost_dict = dict(
             position_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 1000.0,
+            * 0.1,
             velocity_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.0,
+            * 1.0,
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.000,
+            * 0.01,
         )
 
     cost = (
@@ -58,7 +58,7 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     cost += (
         (
             torch.nn.functional.mse_loss(
-                predicted_velocity,
+                torch.abs(predicted_velocity),
                 target_velocity,
                 reduction="none",
             )
@@ -96,7 +96,7 @@ def obs_to_state_target(obs) -> tuple[Any, Any]:
 
     target = dict(
         position=torch.ones_like(position) * 0.45,
-        velocity=torch.ones_like(velocity) * 0.0,
+        velocity=torch.ones_like(velocity) * 2.0,
     )
 
     return state, target
@@ -172,6 +172,7 @@ def main(args):
         prediction_horizon=prediction_horizon,
         num_optimization_step=num_optimization_step,
         lr=lr,
+        std=0.5,
         device=device,
     )
 
@@ -230,9 +231,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=8)
+    argprs.add_argument("--n_envs", type=int, default=16)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=8 * 256)
+    argprs.add_argument("--batch_size", type=int, default=16 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--goal_velocity", type=float, default=0.00)
@@ -246,9 +247,9 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="dummy")
-    argprs.add_argument("--tb_log_name", type=str, default="pendulum_10_10")
-    argprs.add_argument("--save_name", type=str, default="dummy_models/pendulum_10_10")
+    argprs.add_argument("--tb_log_folder", type=str, default="")
+    argprs.add_argument("--tb_log_name", type=str, default="")
+    argprs.add_argument("--save_name", type=str, default="")
 
     args = argprs.parse_args()
 

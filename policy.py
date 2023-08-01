@@ -219,6 +219,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
+
     def _build_mlp_extractor(self) -> None:
         """
         Create the policy and value networks.

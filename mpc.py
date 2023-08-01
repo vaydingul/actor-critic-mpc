@@ -114,6 +114,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 )
                 * self.std
             )
+
         else:
             self.action = action_initial
 

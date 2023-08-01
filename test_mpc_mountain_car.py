@@ -25,11 +25,11 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     if cost_dict is None:
         cost_dict = dict(
             position_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 1000.0,
+            * 0.1,
             velocity_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.0,
+            * 1.0,
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.000,
+            * 0.1,
         )
 
     cost = (
@@ -48,7 +48,7 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     cost += (
         (
             torch.nn.functional.mse_loss(
-                predicted_velocity,
+                torch.abs(predicted_velocity),
                 target_velocity,
                 reduction="none",
             )
@@ -86,7 +86,7 @@ def obs_to_state_target(obs) -> tuple[Any, Any]:
 
     target = dict(
         position=torch.ones_like(position) * 0.45,
-        velocity=torch.ones_like(velocity) * 0.0,
+        velocity=torch.ones_like(velocity) * 5.0,
     )
 
     return state, target
@@ -109,8 +109,9 @@ mpc = ModelPredictiveControlWithoutOptimizer(
     cost,
     action_size=1,
     prediction_horizon=10,
-    num_optimization_step=50,
+    num_optimization_step=10,
     lr=1.0,
+    std=0.5,
     device="cpu",
 )
 
@@ -130,7 +131,7 @@ while True:
     action_selected = action_[:, 0]
     print(action_selected)
     observation, reward, _, information = env.step(action_selected)
-
+    print(f"Reward: {reward}")
     observation = torch.Tensor(observation.copy())
 
     state, target = obs_to_state_target(observation)
