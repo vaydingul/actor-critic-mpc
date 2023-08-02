@@ -387,9 +387,9 @@ class CartPoleContinuousEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.steps_beyond_terminated = None
 
     def step(self, action):
-        assert self.action_space.contains(
-            action
-        ), f"{action!r} ({type(action)}) invalid"
+        # assert self.action_space.contains(
+        #     action
+        # ), f"{action!r} ({type(action)}) invalid"
         assert self.state is not None, "Call reset before using step method."
         x, x_dot, theta, theta_dot = self.state
         force = np.clip(action[0], -self.force_mag, self.force_mag)

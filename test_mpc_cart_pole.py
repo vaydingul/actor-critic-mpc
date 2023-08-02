@@ -5,7 +5,7 @@ import numpy as np
 import env
 from mpc import ModelPredictiveControlWithoutOptimizer
 from system import CartPole
-
+import gymnasium as gym
 # Import make_vec_env to allow parallelization
 from stable_baselines3.common.env_util import make_vec_env
 import torch
@@ -30,11 +30,11 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
     if cost_dict is None:
         cost_dict = dict(
             x_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 01.0,
+            * 10.0,
             x_dot_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
             * 0.0,
             theta_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 100.0,
+            * 1000.0,
             theta_dot_weight=torch.ones(
                 batch_size, prediction_horizon, 1, device=device
             )
@@ -42,30 +42,6 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
             * 0.0,
         )
-
-    # cost = (((predicted_x - target_x).pow(2)) * cost_dict["x_weight"]).mean(1).sum()
-
-    # cost += (
-    #     ((predicted_x_dot - target_x_dot).pow(2) * cost_dict["x_dot_weight"])
-    #     .mean(1)
-    #     .sum()
-    # )
-
-    # cost += (
-    #     (((predicted_theta - target_theta).pow(2)) * cost_dict["theta_weight"])
-    #     .mean(1)
-    #     .sum()
-    # )
-    # cost += (
-    #     (
-    #         (predicted_theta_dot - target_theta_dot).pow(2)
-    #         * cost_dict["theta_dot_weight"]
-    #     )
-    #     .mean(1)
-    #     .sum()
-    # )
-
-    # cost += (action.pow(2) * cost_dict["action_weight"]).mean(1).sum()
 
     cost = (
         (
@@ -157,14 +133,13 @@ env = make_vec_env(
     seed=42,
 )
 
-
 # Create Model Predictive Control model
 mpc = ModelPredictiveControlWithoutOptimizer(
     system,
     cost,
     action_size=1,
     prediction_horizon=10,
-    num_optimization_step=100,
+    num_optimization_step=10,
     lr=1.0,
     std=2.5,
     device="cpu",
@@ -187,19 +162,17 @@ while True:
     print(f"Action: {action_selected}")
     print(f"Cost: {cost_value}")
     observation, reward, done, information = env.step(action_selected)
-
+    counter += 1
     print(f"Reward: {reward}")
+    if done:
+        print(f"Counter: {counter}")
+        counter = 0
+        time.sleep(5.0)
+        
 
     observation = torch.Tensor(observation.copy())
 
     state, target = obs_to_state_target(observation)
-
-    counter += 1
-
-    print(f"Counter: {counter}")
-
-    if np.all(done):
-        counter = 0
-
+    
     # time.sleep(0.1)
     env.render("human")

@@ -7,24 +7,29 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import VecCheckNan
+from stable_baselines3.common.vec_env import DummyVecEnv
 
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
-
-from system import Pendulum, angle_normalize
+from system import CartPole
 from mpc import ModelPredictiveControlWithoutOptimizer
 from typing import Callable, Any
 
-
+from torch import nn
 import torch
+import numpy as np
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
-    batch_size, prediction_horizon, _ = predicted_state["theta"].shape
-    device = predicted_state["theta"].device
+    batch_size, prediction_horizon, _ = predicted_state["x"].shape
+    device = predicted_state["x"].device
 
+    predicted_x = predicted_state["x"]
+    predicted_x_dot = predicted_state["x_dot"]
     predicted_theta = predicted_state["theta"]
     predicted_theta_dot = predicted_state["theta_dot"]
 
+    target_x = target_state["x"].unsqueeze(1).expand(-1, prediction_horizon, -1)
+    target_x_dot = target_state["x_dot"].unsqueeze(1).expand(-1, prediction_horizon, -1)
     target_theta = target_state["theta"].unsqueeze(1).expand(-1, prediction_horizon, -1)
     target_theta_dot = (
         target_state["theta_dot"].unsqueeze(1).expand(-1, prediction_horizon, -1)
@@ -32,43 +37,51 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
 
     if cost_dict is None:
         cost_dict = dict(
-            theta_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            x_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
             * 10.0,
+            x_dot_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 0.0,
+            theta_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
+            * 1000.0,
             theta_dot_weight=torch.ones(
                 batch_size, prediction_horizon, 1, device=device
             )
-            * 0.1,
+            * 0.0,
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.001,
+            * 0.0,
         )
-    elif isinstance(cost_dict, torch.Tensor):
-        cost_dict = cost_tensor_to_dict(cost_dict)
-    else:
-        assert isinstance(cost_dict, dict) or isinstance(cost_dict, list)
-
-    # cost = (
-    #     (
-    #         ((angle_normalize(predicted_theta) - angle_normalize(target_theta)).pow(2))
-    #         * cost_dict["theta_weight"]
-    #     )
-    #     .mean(1)
-    #     .sum()
-    # )
-    # cost += (
-    #     (
-    #         ((predicted_theta_dot - target_theta_dot).pow(2))
-    #         * cost_dict["theta_dot_weight"]
-    #     )
-    #     .mean(1)
-    #     .sum()
-    # )
-    # cost += (((action).pow(2)) * cost_dict["action_weight"]).mean(1).sum()
 
     cost = (
         (
             torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta),
-                angle_normalize(target_theta),
+                predicted_x,
+                target_x,
+                reduction="none",
+            )
+            * cost_dict["x_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
+
+    cost += (
+        (
+            torch.nn.functional.mse_loss(
+                predicted_x_dot,
+                target_x_dot,
+                reduction="none",
+            )
+            * cost_dict["x_dot_weight"]
+        )
+        .mean(1)
+        .sum()
+    )
+
+    cost += (
+        (
+            torch.nn.functional.mse_loss(
+                predicted_theta,
+                target_theta,
                 reduction="none",
             )
             * cost_dict["theta_weight"]
@@ -90,48 +103,32 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
         .sum()
     )
 
-    cost += (
-        (
-            torch.norm(
-                action,
-                p=2,
-                dim=-1,
-                keepdim=True,
-            )
-            * cost_dict["action_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
+    cost += (((action).pow(2)) * cost_dict["action_weight"]).mean(1).sum()
 
     return cost
 
 
 def obs_to_state_target(obs) -> tuple[Any, Any]:
-    theta = torch.atan2(obs[:, 1], obs[:, 0]).unsqueeze(-1)
-    theta_dot = obs[:, 2].unsqueeze(-1)
+    x = obs[:, 0].unsqueeze(1)
+    x_dot = obs[:, 1].unsqueeze(1)
+    theta = obs[:, 2].unsqueeze(1)
+    theta_dot = obs[:, 3].unsqueeze(1)
 
     state = dict(
+        x=x,
+        x_dot=x_dot,
         theta=theta,
         theta_dot=theta_dot,
     )
 
     target = dict(
+        x=torch.ones_like(x) * 0.0,
+        x_dot=torch.ones_like(x_dot) * 0.0,
         theta=torch.ones_like(theta) * 0.0,
         theta_dot=torch.ones_like(theta_dot) * 0.0,
     )
 
     return state, target
-
-
-def cost_tensor_to_dict(cost_tensor):
-    cost_dict = dict(
-        theta_weight=cost_tensor[..., 0].unsqueeze(-1),
-        theta_dot_weight=cost_tensor[..., 1].unsqueeze(-1),
-        action_weight=cost_tensor[..., 2].unsqueeze(-1),
-    )
-
-    return cost_dict
 
 
 def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
@@ -148,6 +145,7 @@ def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
     def _init() -> gym.Env:
         env = gym.make(*args, **kwargs)
         env = Monitor(env)
+
         env.reset(seed=seed + rank)
         return env
 
@@ -173,10 +171,7 @@ def main(args):
     device = args.device
     seed = args.seed
     # System parameters
-    dt = args.dt
-    m = args.m
-    g = args.g
-    l = args.l
+    goal_velocity = args.goal_velocity
 
     # MPC parameters
     action_size = args.action_size
@@ -196,12 +191,7 @@ def main(args):
     save_name = args.save_name
 
     # Create system
-    system = Pendulum(
-        dt=dt,
-        m=m,
-        g=g,
-        l=l,
-    )
+    system = CartPole()
 
     # Create Model Predictive Control model
     mpc_class = ModelPredictiveControlWithoutOptimizer
@@ -212,7 +202,7 @@ def main(args):
         prediction_horizon=prediction_horizon,
         num_optimization_step=num_optimization_step,
         lr=lr,
-        std=0.6,
+        std=0.5,
         device=device,
     )
 
@@ -220,9 +210,8 @@ def main(args):
         make_env(
             rank=i,
             seed=seed,
-            id="Pendulum-v1",
+            id="CartPoleContinuous-v0",
             render_mode="rgb_array",
-            g=g,
         )
         for i in range(n_envs)
     ]
@@ -248,6 +237,7 @@ def main(args):
     if num_optimization_step == 0:
         policy_class = "MlpPolicy"
         policy_kwargs = dict()
+
     # Create model
     model = PPO(
         policy_class,
@@ -258,13 +248,11 @@ def main(args):
         batch_size=batch_size,
         tensorboard_log=tb_log_folder,
         device=device,
-        gamma=0.9,
-        learning_rate=1e-3,
-        gae_lambda=0.95,
-        ent_coef=0.0,
         clip_range=0.2,
-        use_sde=True,
-        sde_sample_freq=4,
+        ent_coef=0.0,
+        gae_lambda=0.8,
+        gamma=0.98,
+        learning_rate=1e-3,
     )
 
     # Train model
@@ -287,23 +275,20 @@ if __name__ == "__main__":
     argprs.add_argument("--batch_size", type=int, default=16 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
-    argprs.add_argument("--dt", type=float, default=0.05)
-    argprs.add_argument("--m", type=float, default=1.0)
-    argprs.add_argument("--g", type=float, default=10.0)
-    argprs.add_argument("--l", type=float, default=1.0)
+    argprs.add_argument("--goal_velocity", type=float, default=0.00)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=5)
-    argprs.add_argument("--num_optimization_step", type=int, default=5)
+    argprs.add_argument("--prediction_horizon", type=int, default=1)
+    argprs.add_argument("--num_optimization_step", type=int, default=1)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
-    argprs.add_argument("--num_cost_terms", type=int, default=3)
+    argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
     argprs.add_argument("--tb_log_folder", type=str, default="dummy")
-    argprs.add_argument("--tb_log_name", type=str, default="acmpc_5_5_action")
-    argprs.add_argument("--save_name", type=str, default="model_acmpc_5_5")
+    argprs.add_argument("--tb_log_name", type=str, default="acmpc_1_1")
+    argprs.add_argument("--save_name", type=str, default="m11")
 
     args = argprs.parse_args()
 

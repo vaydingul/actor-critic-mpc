@@ -13,6 +13,11 @@ model = PPO(
     batch_size=2048,
     n_steps=2048,
     verbose=1,
+    clip_range=0.2,
+    ent_coef=0.0,
+    gae_lambda=0.8,
+    gamma=0.98,
+    learning_rate=0.001,
 )
 
 

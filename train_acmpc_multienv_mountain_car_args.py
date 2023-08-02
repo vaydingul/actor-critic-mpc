@@ -188,7 +188,7 @@ def main(args):
         for i in range(n_envs)
     ]
     env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
-    env = VecCheckNan(env, raise_exception=True)
+
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -208,6 +208,12 @@ def main(args):
         log_std_init=-3.29,
     )
 
+    if num_optimization_step == 0:
+        policy_class = "MlpPolicy"
+        policy_kwargs = dict(
+            log_std_init=-3.29,
+        )
+
     # Create model
     model = PPO(
         policy_class,
@@ -221,10 +227,11 @@ def main(args):
         clip_range=0.1,
         ent_coef=0.00429,
         gae_lambda=0.9,
-        gamma=0.999,
+        gamma=0.9999,
         learning_rate=7.77e-05,
         max_grad_norm=5.0,
         vf_coef=0.19,
+        use_sde=True,
     )
 
     # Train model
