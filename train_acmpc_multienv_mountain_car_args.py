@@ -1,14 +1,14 @@
 import env
 from argparse import ArgumentParser
-from policy import (
+from policy_3 import (
     ActorCriticModelPredictiveControlPolicy,
 )
 import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
-
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import VecCheckNan
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from system import MountainCar
 from mpc import ModelPredictiveControlWithoutOptimizer
@@ -16,6 +16,7 @@ from typing import Callable, Any
 
 from torch import nn
 import torch
+import numpy as np
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
@@ -116,6 +117,7 @@ def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
     def _init() -> gym.Env:
         env = gym.make(*args, **kwargs)
         env = Monitor(env)
+
         env.reset(seed=seed + rank)
         return env
 
@@ -185,7 +187,8 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = VecCheckNan(env, raise_exception=True)
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -202,6 +205,7 @@ def main(args):
         obs_to_state_target=obs_to_state_target,
         # features_extractor_class=features_extractor_class,
         # features_extractor_kwargs=features_extractor_kwargs,
+        log_std_init=-3.29,
     )
 
     # Create model
@@ -214,6 +218,13 @@ def main(args):
         batch_size=batch_size,
         tensorboard_log=tb_log_folder,
         device=device,
+        clip_range=0.1,
+        ent_coef=0.00429,
+        gae_lambda=0.9,
+        gamma=0.999,
+        learning_rate=7.77e-05,
+        max_grad_norm=5.0,
+        vf_coef=0.19,
     )
 
     # Train model
@@ -239,8 +250,8 @@ if __name__ == "__main__":
     argprs.add_argument("--goal_velocity", type=float, default=0.00)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=10)
-    argprs.add_argument("--num_optimization_step", type=int, default=10)
+    argprs.add_argument("--prediction_horizon", type=int, default=5)
+    argprs.add_argument("--num_optimization_step", type=int, default=5)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")

@@ -6,7 +6,7 @@ import utils
 
 from stable_baselines3.common.distributions import DiagGaussianDistribution
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 
 pygame.font.init()
 
@@ -47,7 +47,6 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
         Returns:
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         torch.Tensor: The action tensor. The shape of the tensor is (batch_size, action_size).
         """
-
         return self._optimize(
             current_state=current_state,
             target_state=target_state,
@@ -73,8 +72,11 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
 
         self._reset(action_initial, batch_size)
 
-        loss = torch.tensor(0.0)
+        loss = None
+
         for _ in range(self.num_optimization_step):
+            # self.action.grad = None
+
             (predicted_state) = self._predict(current_state)
 
             loss = self._loss(
@@ -83,6 +85,7 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 cost_dict,
             )
 
+            # loss.backward(retain_graph=True, create_graph=True, inputs=(self.action,))
             action_grad = torch.autograd.grad(
                 loss,
                 self.action,
@@ -90,6 +93,9 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 create_graph=True,
             )[0]
 
+            # torch.nn.utils.clip_grad_norm_(self.action, 1.0)
+
+            # self.action = self.action - self.lr * self.action.grad
             self.action = self.action - self.lr * action_grad
             # self.action.retain_grad()
 

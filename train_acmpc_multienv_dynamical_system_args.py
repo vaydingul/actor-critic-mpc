@@ -1,6 +1,6 @@
 import env
 from argparse import ArgumentParser
-from policy import (
+from policy_3 import (
     ActorCriticModelPredictiveControlPolicy,
     ActorCriticModelPredictiveControlFeatureExtractor,
 )

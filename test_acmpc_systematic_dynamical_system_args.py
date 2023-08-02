@@ -1,10 +1,7 @@
 from glob import glob
 import env
 from argparse import ArgumentParser
-from policy import (
-    ActorCriticModelPredictiveControlPolicy,
-    ActorCriticModelPredictiveControlFeatureExtractor,
-)
+
 import gymnasium as gym
 import numpy as np
 from wrapper import RelativeRedundant
@@ -86,8 +83,6 @@ def main(args):
     results_dict["model"] = ["mean_reward", "std_reward", "mean_length", "std_length"]
 
     for file in glob(models_path + "*.zip"):
-
-
         try:
             # Create model
             model = PPO.load(file, device=device)
@@ -117,13 +112,14 @@ def main(args):
     results_df.to_csv(evaluation_name + ".csv")
 
 
-
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
     argprs.add_argument("--device", type=str, default="cuda")
     argprs.add_argument("--models_path", type=str, default="models_single_env/")
-    argprs.add_argument("--evaluation_name", type=str, default="high_noise_high_wind_models_single_env")
+    argprs.add_argument(
+        "--evaluation_name", type=str, default="high_noise_high_wind_models_single_env"
+    )
     argprs.add_argument("--num_episodes", type=int, default=100)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.5)
     argprs.add_argument("--agent_velocity_noise_level", type=float, default=0.1)

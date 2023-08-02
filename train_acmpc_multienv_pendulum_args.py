@@ -1,15 +1,14 @@
 import env
 from argparse import ArgumentParser
-from policy import (
+from policy_3 import (
     ActorCriticModelPredictiveControlPolicy,
-    ActorCriticModelPredictiveControlFeatureExtractor,
 )
 import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
 from system import Pendulum, angle_normalize
 from mpc import ModelPredictiveControlWithoutOptimizer
@@ -42,6 +41,10 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
             action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
             * 0.001,
         )
+    elif isinstance(cost_dict, torch.Tensor):
+        cost_dict = cost_tensor_to_dict(cost_dict)
+    else:
+        assert isinstance(cost_dict, dict) or isinstance(cost_dict, list)
 
     # cost = (
     #     (
@@ -114,11 +117,21 @@ def obs_to_state_target(obs) -> tuple[Any, Any]:
     )
 
     target = dict(
-        theta=torch.ones_like(theta) * 0,
+        theta=torch.ones_like(theta) * 0.0,
         theta_dot=torch.ones_like(theta_dot) * 0.0,
     )
 
     return state, target
+
+
+def cost_tensor_to_dict(cost_tensor):
+    cost_dict = dict(
+        theta_weight=cost_tensor[..., 0].unsqueeze(-1),
+        theta_dot_weight=cost_tensor[..., 1].unsqueeze(-1),
+        action_weight=cost_tensor[..., 2].unsqueeze(-1),
+    )
+
+    return cost_dict
 
 
 def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
@@ -213,7 +226,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -240,10 +253,15 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=n_steps,
         batch_size=batch_size,
-        gamma=0.98,
-        learning_rate=1e-3,
         tensorboard_log=tb_log_folder,
         device=device,
+        gamma=0.9,
+        learning_rate=1e-3,
+        gae_lambda=0.95,
+        ent_coef=0.0,
+        clip_range=0.2,
+        use_sde=True,
+        sde_sample_freq=4,
     )
 
     # Train model
@@ -272,17 +290,17 @@ if __name__ == "__main__":
     argprs.add_argument("--l", type=float, default=1.0)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=7)
-    argprs.add_argument("--num_optimization_step", type=int, default=7)
+    argprs.add_argument("--prediction_horizon", type=int, default=5)
+    argprs.add_argument("--num_optimization_step", type=int, default=5)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
-    argprs.add_argument("--num_cost_terms", type=int, default=2)
+    argprs.add_argument("--num_cost_terms", type=int, default=3)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="")
-    argprs.add_argument("--tb_log_name", type=str, default="")
-    argprs.add_argument("--save_name", type=str, default="model")
+    argprs.add_argument("--tb_log_folder", type=str, default="dummy")
+    argprs.add_argument("--tb_log_name", type=str, default="acmpc_5_5_action")
+    argprs.add_argument("--save_name", type=str, default="model_acmpc_5_5")
 
     args = argprs.parse_args()
 
