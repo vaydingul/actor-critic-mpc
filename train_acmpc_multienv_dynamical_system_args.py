@@ -225,7 +225,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
