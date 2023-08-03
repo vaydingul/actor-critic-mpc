@@ -243,18 +243,6 @@ def main(args):
         features_extractor_kwargs=features_extractor_kwargs,
     )
 
-    # Create model
-    model = PPO(
-        policy_class,
-        env,
-        verbose=2,
-        policy_kwargs=policy_kwargs,
-        n_steps=n_steps,
-        batch_size=batch_size,
-        device=device,
-        tensorboard_log=f"tensorboard_logs/",
-    )
-
     # WandB integration
     run = wandb.init(
         project="acmpc",
@@ -268,14 +256,26 @@ def main(args):
     env = VecVideoRecorder(
         env,
         f"videos/{run.id}",
-        record_video_trigger=lambda x: x % 2000 == 0,
-        video_length=200,
+        record_video_trigger=lambda x: x % 1000 == 0,
+        video_length=100,
+    )
+
+    # Create model
+    model = PPO(
+        policy_class,
+        env,
+        verbose=2,
+        policy_kwargs=policy_kwargs,
+        n_steps=n_steps,
+        batch_size=batch_size,
+        device=device,
+        tensorboard_log=f"tensorboard_logs/",
     )
 
     # Train model
     model.learn(
         total_timesteps=total_timesteps,
-         callback=WandbCallback(
+        callback=WandbCallback(
             verbose=2,
             model_save_path=f"save_name_{run.id}",
             model_save_freq=total_timesteps // 10,
