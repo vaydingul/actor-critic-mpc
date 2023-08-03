@@ -1,6 +1,6 @@
 import env
 from argparse import ArgumentParser
-from policy_3 import (
+from policy import (
     ActorCriticModelPredictiveControlPolicy,
 )
 import gymnasium as gym

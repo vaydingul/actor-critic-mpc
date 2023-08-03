@@ -1,6 +1,6 @@
 import env
 from argparse import ArgumentParser
-from policy_3 import (
+from policy import (
     ActorCriticModelPredictiveControlPolicy,
     ActorCriticModelPredictiveControlFeatureExtractor,
 )
@@ -10,14 +10,21 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import (
+    SubprocVecEnv,
+    VecVideoRecorder,
+    DummyVecEnv,
+)
 
 from system import DynamicalSystem
 from mpc import ModelPredictiveControlWithoutOptimizer
 from typing import Callable, Any
 
-from torch import nn
+
 import torch
+
+from wandb.integration.sb3 import WandbCallback
+import wandb
 
 WINDOW_SIZE = 512
 
@@ -70,28 +77,6 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
         .sum()
     )
 
-    # Action first and second derivative cost
-    # if action is not None:
-    #     action_first_derivative = torch.diff(action, dim=1)
-    #     cost += (
-    #         (
-    #             cost_dict["action_first_derivative_weight"]
-    #             * torch.norm(action_first_derivative, p=2, dim=-1)
-    #         )
-    #         .mean(dim=1)
-    #         .sum()
-    #     )
-
-    #     action_second_derivative = torch.diff(action_first_derivative, dim=1)
-    #     cost += (
-    #         (
-    #             cost_dict["action_second_derivative_weight"]
-    #             * torch.norm(action_second_derivative, p=2, dim=-1)
-    #         )
-    #         .mean(dim=1)
-    #         .sum()
-    #     )
-
     return cost
 
 
@@ -133,7 +118,7 @@ def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
         env = gym.make(*args, **kwargs)
         env = RelativeRedundant(env)
         env = Monitor(env)
-        env.reset(seed=seed + rank)
+        # env.reset(seed=seed + rank)
         return env
 
     set_random_seed(seed)
@@ -193,8 +178,8 @@ def main(args):
 
     # Learning parameters
     total_timesteps = args.total_timesteps
-    tb_log_folder = args.tb_log_folder if args.tb_log_folder != "" else None
-    tb_log_name = args.tb_log_name
+
+    log_name = args.log_name
     save_name = args.save_name
 
     # Create system
@@ -228,7 +213,7 @@ def main(args):
             rank=i,
             seed=seed,
             id="DynamicalSystem-v0",
-            render_mode=None,
+            render_mode="rgb_array",
             size=size,
             window_size=window_size,
             distance_threshold=distance_threshold,
@@ -240,7 +225,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -266,28 +251,51 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=n_steps,
         batch_size=batch_size,
-        tensorboard_log=tb_log_folder,
         device=device,
+    )
+
+    # WandB integration
+    run = wandb.init(
+        project="acmpc",
+        group="dynamical_system",
+        name=log_name,
+        config=args,
+        sync_tensorboard=True,
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+    )
+    env = VecVideoRecorder(
+        env,
+        f"videos/{run.id}",
+        record_video_trigger=lambda x: x % 2000 == 0,
+        video_length=200,
     )
 
     # Train model
     model.learn(
         total_timesteps=total_timesteps,
-        progress_bar=True,
-        tb_log_name=tb_log_name,
+         callback=WandbCallback(
+            verbose=2,
+            model_save_path=f"save_name_{run.id}",
+            model_save_freq=total_timesteps // 10,
+            gradient_save_freq=total_timesteps // 500,
+            log="all",
+        ),
     )
+
+    run.finish()
 
     # Change device to cpu
 
-    model.save(save_name)
+    # model.save(save_name)
 
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
-    argprs.add_argument("--n_envs", type=int, default=32)
+    argprs.add_argument("--n_envs", type=int, default=2)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=32 * 256)
+    argprs.add_argument("--batch_size", type=int, default=2 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
@@ -312,9 +320,8 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
-    argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="./")
-    argprs.add_argument("--tb_log_name", type=str, default="vanilla")
+    argprs.add_argument("--total_timesteps", type=int, default=100_000)
+    argprs.add_argument("--log_name", type=str, default="vanilla")
     argprs.add_argument("--save_name", type=str, default="model")
 
     args = argprs.parse_args()

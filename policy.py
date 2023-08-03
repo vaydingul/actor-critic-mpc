@@ -17,6 +17,7 @@ from stable_baselines3.common.distributions import (
     MultiCategoricalDistribution,
     StateDependentNoiseDistribution,
 )
+from stable_baselines3.common.distributions import Distribution
 from stable_baselines3.common.type_aliases import Schedule, MaybeCallback
 from mpc import ModelPredictiveControlWithoutOptimizer
 
@@ -65,124 +66,6 @@ class ActorCriticModelPredictiveControlFeatureExtractor(BaseFeaturesExtractor):
         return self.feature_extractor(observations[..., : self.input_dim])
 
 
-class ActorCriticModelPredictiveControlNetwork(nn.Module):
-    """
-    Custom network for policy and value function.
-    It receives as input the features extracted by the features extractor.
-
-    :param feature_dim: dimension of the features extracted with the features_extractor (e.g. features from a CNN)
-    :param last_layer_dim_pi: (int) number of units for the last layer of the policy network
-    :param last_layer_dim_vf: (int) number of units for the last layer of the value network
-    """
-
-    def __init__(
-        self,
-        feature_dim: int,
-        action_dim: int,
-        mpc_class: Type[
-            ModelPredictiveControlWithoutOptimizer
-        ] = ModelPredictiveControlWithoutOptimizer,
-        mpc_kwargs: Optional[Dict[str, Any]] = None,
-        prediction_horizon: int = 10,
-        predict_action: bool = False,
-        predict_cost: bool = False,
-        num_cost_terms: int = 1,
-        obs_to_state_target: Optional[Callable] = None,
-        last_layer_dim_pi: int = 64,
-        last_layer_dim_vf: int = 64,
-    ):
-        super().__init__()
-
-        assert predict_action != predict_cost, "Cannot predict both action and cost"
-
-        self.action_dim = action_dim
-        self.prediction_horizon = prediction_horizon
-        self.predict_action = predict_action
-        self.predict_cost = predict_cost
-        self.num_cost_terms = num_cost_terms
-        self.obs_to_state_target = obs_to_state_target
-
-        # IMPORTANT:
-        # Save output dimensions, used to create the distributions
-        self.latent_dim_pi = last_layer_dim_pi
-        self.latent_dim_vf = last_layer_dim_vf
-
-        # Policy network
-        self.policy_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_pi),
-            nn.Tanh(),
-            nn.Linear(last_layer_dim_pi, last_layer_dim_pi),
-            nn.Tanh(),
-            nn.Linear(
-                last_layer_dim_pi,
-                action_dim * prediction_horizon
-                if predict_action
-                else num_cost_terms * prediction_horizon,
-            ),
-        )
-
-        # MPC head of policy network
-        self.policy_net_mpc = mpc_class(**mpc_kwargs)
-
-        # Value network
-        self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_vf),
-            nn.Tanh(),
-            nn.Linear(last_layer_dim_vf, last_layer_dim_vf),
-            nn.Tanh(),
-        )
-
-    def forward(
-        self, features: th.Tensor, obs: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor]:
-        """
-        :return: (th.Tensor, th.Tensor) latent_policy, latent_value of the specified network.
-                                        If all layers are shared, then ``latent_policy == latent_value``
-        """
-
-        return self.forward_actor(features, obs), self.forward_critic(features)
-
-    def forward_actor(self, features: th.Tensor, obs: th.Tensor) -> th.Tensor:
-        # Defactorize obs
-
-        state, target = self.obs_to_state_target(obs)
-
-        with th.enable_grad():
-            policy_net_output = self.policy_net(features)
-
-            if self.predict_action:
-                action_initial = policy_net_output.view(
-                    (-1, self.prediction_horizon, self.action_dim)
-                )
-
-                action_mpc, _ = self.policy_net_mpc(
-                    state,
-                    target,
-                    action_initial,
-                    None,
-                )
-
-            else:
-                cost_weights = policy_net_output.view(
-                    (-1, self.prediction_horizon, self.num_cost_terms)
-                )
-                cost_dict = {
-                    "location_weight": cost_weights[..., 0],
-                    "velocity_weight": cost_weights[..., 1],
-                }
-                action_mpc, _ = self.policy_net_mpc(
-                    state,
-                    target,
-                    None,
-                    cost_dict,
-                )
-        action = action_mpc[:, 0]
-        return action
-
-    def forward_critic(self, features: th.Tensor) -> th.Tensor:
-        return self.value_net(features)
-
-
 class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
     def __init__(
         self,
@@ -200,13 +83,25 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         *args,
         **kwargs,
     ):
-        self.mpc_class = mpc_class
-        self.mpc_kwargs = mpc_kwargs or {}
         self.action_dim = mpc_kwargs["action_size"]
+        self.prediction_horizon = mpc_kwargs["prediction_horizon"]
         self.predict_action = predict_action
         self.predict_cost = predict_cost
         self.num_cost_terms = num_cost_terms
         self.obs_to_state_target = obs_to_state_target
+
+        assert (
+            self.predict_action != self.predict_cost
+        ), "Either predict action or predict cost must be True"
+
+        if "net_arch" not in kwargs:
+            kwargs["net_arch"] = dict(pi=[64, 64], vf=[64, 64])
+
+        kwargs["net_arch"]["pi"].append(
+            self.prediction_horizon * self.action_dim
+            if self.predict_action
+            else self.prediction_horizon * self.num_cost_terms
+        )
 
         # Disable orthogonal initialization
         kwargs["ortho_init"] = False
@@ -219,25 +114,7 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
-    def _build_mlp_extractor(self) -> None:
-        """
-        Create the policy and value networks.
-        Part of the layers can be shared.
-        """
-        # Note: If net_arch is None and some features extractor is used,
-        #       net_arch here is an empty list and mlp_extractor does not
-        #       really contain any layers (acts like an identity module).
-        self.mlp_extractor = ActorCriticModelPredictiveControlNetwork(
-            self.features_dim,
-            action_dim=self.action_dim,
-            mpc_class=self.mpc_class,
-            mpc_kwargs=self.mpc_kwargs,
-            prediction_horizon=self.mpc_kwargs["prediction_horizon"],
-            predict_action=self.predict_action,
-            predict_cost=self.predict_cost,
-            num_cost_terms=self.num_cost_terms,
-            obs_to_state_target=self.obs_to_state_target,
-        )
+        self.mpc = mpc_class(**mpc_kwargs)
 
     def _build(self, lr_schedule: Schedule) -> None:
         """
@@ -248,31 +125,20 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         """
         self._build_mlp_extractor()
 
-        # latent_dim_pi = self.mlp_extractor.latent_dim_pi
+        latent_dim_pi = self.mlp_extractor.latent_dim_pi
 
-        # if isinstance(self.action_dist, DiagGaussianDistribution):
-        #     self.action_net, self.log_std = self.action_dist.proba_distribution_net(
-        #         latent_dim=latent_dim_pi, log_std_init=self.log_std_init
-        #     )
-        # elif isinstance(self.action_dist, StateDependentNoiseDistribution):
-        #     self.action_net, self.log_std = self.action_dist.proba_distribution_net(
-        #         latent_dim=latent_dim_pi,
-        #         latent_sde_dim=latent_dim_pi,
-        #         log_std_init=self.log_std_init,
-        #     )
-        # elif isinstance(
-        #     self.action_dist,
-        #     (
-        #         CategoricalDistribution,
-        #         MultiCategoricalDistribution,
-        #         BernoulliDistribution,
-        #     ),
-        # ):
-        #     self.action_net = self.action_dist.proba_distribution_net(
-        #         latent_dim=latent_dim_pi
-        #     )
-        # else:
-        #     raise NotImplementedError(f"Unsupported distribution '{self.action_dist}'.")
+        if isinstance(self.action_dist, DiagGaussianDistribution):
+            _, self.log_std = self.action_dist.proba_distribution_net(
+                latent_dim=latent_dim_pi, log_std_init=self.log_std_init
+            )
+        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            _, self.log_std = self.action_dist.proba_distribution_net(
+                latent_dim=latent_dim_pi,
+                latent_sde_dim=latent_dim_pi,
+                log_std_init=self.log_std_init,
+            )
+        else:
+            raise NotImplementedError(f"Unsupported distribution '{self.action_dist}'.")
 
         self.value_net = nn.Linear(self.mlp_extractor.latent_dim_vf, 1)
         # Init weights: use orthogonal initialization
@@ -316,80 +182,147 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
         # Preprocess the observation if needed
         features = self.extract_features(obs)
         if self.share_features_extractor:
-            mean_actions, latent_vf = self.mlp_extractor(features, obs)
+            latent_pi, latent_vf = self.mlp_extractor(features)
         else:
             pi_features, vf_features = features
-            # latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            mean_actions = self.mlp_extractor.forward_actor(pi_features, obs)
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
             latent_vf = self.mlp_extractor.forward_critic(vf_features)
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)
-        # distribution = self._get_action_dist_from_latent(latent_pi)
-        distribution = DiagGaussianDistribution(action_dim=self.action_dim)
-        distribution = distribution.proba_distribution(
-            mean_actions=mean_actions,
-            log_std=th.zeros_like(mean_actions, requires_grad=True),
-        )
+
+        state, target = self.obs_to_state_target(obs)
+        batch_size = obs.shape[0]
+
+        with th.enable_grad():
+            if self.predict_action:
+                action_initial = latent_pi.view(
+                    batch_size, self.prediction_horizon, self.action_dim
+                )
+                action_initial.requires_grad = True
+                mean_actions, _ = self.mpc(state, target, action_initial, None)
+
+            else:
+                cost_dict = latent_pi.view(
+                    batch_size, self.prediction_horizon, self.num_cost_terms
+                )
+
+                mean_actions, _ = self.mpc(state, target, None, cost_dict)
+
+        mean_actions = mean_actions[:, 0]
+
+        if isinstance(self.action_dist, DiagGaussianDistribution):
+            distribution = self.action_dist.proba_distribution(
+                mean_actions, self.log_std
+            )
+
+        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            distribution = self.action_dist.proba_distribution(
+                mean_actions, self.log_std, latent_pi
+            )
+        else:
+            raise ValueError("Invalid action distribution")
+
         actions = distribution.get_actions(deterministic=deterministic)
         log_prob = distribution.log_prob(actions)
-        actions = actions.reshape((-1, self.action_dim))
+        actions = actions.reshape((-1, *self.action_space.shape))
         return actions, values, log_prob
 
     def evaluate_actions(
         self, obs: th.Tensor, actions: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor, Optional[th.Tensor]]:
+    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
-        Evaluate actions according to the current policy,
-        given the observations.
+        Evaluate the values, log probability and entropy for given actions given the current policy
 
         :param obs: Observation
         :param actions: Actions
-        :return: estimated value, log likelihood of taking those actions
-            and entropy of the action distribution.
+        :return: values, log probability and entropy
+        """
+        # Preprocess the observation if needed
+        features = self.extract_features(obs)
+        if self.share_features_extractor:
+            latent_pi, latent_vf = self.mlp_extractor(features)
+        else:
+            pi_features, vf_features = features
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
+            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+
+        state, target = self.obs_to_state_target(obs)
+        batch_size = obs.shape[0]
+
+        if self.predict_action:
+            action_initial = latent_pi.view(
+                batch_size, self.prediction_horizon, self.action_dim
+            )
+
+            mean_actions, _ = self.mpc(state, target, action_initial, None)
+
+        else:
+            cost_dict = latent_pi.view(
+                batch_size, self.prediction_horizon, self.num_cost_terms
+            )
+
+            mean_actions, _ = self.mpc(state, target, None, cost_dict)
+
+        mean_actions = mean_actions[:, 0]
+
+        if isinstance(self.action_dist, DiagGaussianDistribution):
+            distribution = self.action_dist.proba_distribution(
+                mean_actions, self.log_std
+            )
+
+        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            distribution = self.action_dist.proba_distribution(
+                mean_actions, self.log_std, latent_pi
+            )
+        else:
+            raise ValueError("Invalid action distribution")
+
+        log_prob = distribution.log_prob(actions)
+        dist_entropy = distribution.entropy()
+        values = self.value_net(latent_vf).flatten()
+        return values, log_prob, dist_entropy
+
+    def get_distribution(self, obs: th.Tensor) -> Distribution:
+        """
+        Get the current policy distribution given the observations.
+
+        :param obs:
+        :return: the action distribution.
         """
         features = self.extract_features(obs)
         if self.share_features_extractor:
-            mean_actions, latent_vf = self.mlp_extractor(features, obs)
+            latent_pi, _ = self.mlp_extractor(features)
         else:
-            pi_features, vf_features = features
-            mean_actions = self.mlp_extractor.forward_actor(pi_features, obs)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
-        values = self.value_net(latent_vf)
-        # distribution = self._get_action_dist_from_latent(latent_pi)
-        distribution = DiagGaussianDistribution(action_dim=self.action_dim)
-        distribution = distribution.proba_distribution(
-            mean_actions=mean_actions, log_std=th.zeros_like(mean_actions)
-        )
-        log_prob = distribution.log_prob(actions)
-        return values, log_prob, distribution.entropy()
+            pi_features, _ = features
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
 
-    def predict(
-        self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
-        deterministic: bool = False,
-    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
-        """
-        Get the policy action from an observation (and optional hidden state).
-        Includes sugar-coating to handle different observations (e.g. normalizing images).
+        state, target = self.obs_to_state_target(obs)
+        batch_size = obs.shape[0]
 
-        :param observation: the input observation
-        :param state: The last hidden states (can be None, used in recurrent policies)
-        :param episode_start: The last masks (can be None, used in recurrent policies)
-            this correspond to beginning of episodes,
-            where the hidden states of the RNN must be reset.
-        :param deterministic: Whether or not to return deterministic actions.
-        :return: the model's action and the next hidden state
-            (used in recurrent policies)
-        """
+        with th.enable_grad():
+            if self.predict_action:
+                action_initial = latent_pi.view(
+                    batch_size, self.prediction_horizon, self.action_dim
+                )
+                action_initial.requires_grad = True
+                mean_actions, _ = self.mpc(state, target, action_initial, None)
 
-        # Convert to torch tensor if needed
-        observation = th.as_tensor(observation).to(self.device)
+            else:
+                cost_dict = latent_pi.view(
+                    batch_size, self.prediction_horizon, self.num_cost_terms
+                )
 
-        # Compute the values
-        with th.no_grad():
-            action, _, _ = self.forward(observation, deterministic=deterministic)
-            action = action.cpu().numpy()
+                cost_dict = th.clamp(cost_dict, min=10.0, max=10.0)
 
-        return action, state
+                mean_actions, _ = self.mpc(state, target, None, cost_dict)
+
+        mean_actions = mean_actions[:, 0]
+
+        if isinstance(self.action_dist, DiagGaussianDistribution):
+            return self.action_dist.proba_distribution(mean_actions, self.log_std)
+        elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            return self.action_dist.proba_distribution(
+                mean_actions, self.log_std, latent_pi
+            )
+        else:
+            raise ValueError("Invalid action distribution")
