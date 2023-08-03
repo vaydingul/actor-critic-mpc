@@ -225,7 +225,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -260,6 +260,10 @@ def main(args):
         record_video_trigger=lambda x: x % 100_000 == 0,
         video_length=200,
     )
+
+    if num_optimization_step == 0:
+        policy_class = "MlpPolicy"
+        policy_kwargs = dict()
 
     # Create model
     model = PPO(

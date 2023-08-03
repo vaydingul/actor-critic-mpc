@@ -1,6 +1,6 @@
 import env
 from argparse import ArgumentParser
-from policy_3 import (
+from policy import (
     ActorCriticModelPredictiveControlPolicy,
 )
 import gymnasium as gym
@@ -8,7 +8,11 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.monitor import Monitor
 
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import (
+    SubprocVecEnv,
+    DummyVecEnv,
+    VecVideoRecorder,
+)
 
 from system import Pendulum, angle_normalize
 from mpc import ModelPredictiveControlWithoutOptimizer
@@ -16,6 +20,9 @@ from typing import Callable, Any
 
 
 import torch
+
+from wandb.integration.sb3 import WandbCallback
+import wandb
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
@@ -191,8 +198,8 @@ def main(args):
 
     # Learning parameters
     total_timesteps = args.total_timesteps
-    tb_log_folder = args.tb_log_folder if args.tb_log_folder != "" else None
-    tb_log_name = args.tb_log_name
+
+    log_name = args.log_name
     save_name = args.save_name
 
     # Create system
@@ -226,7 +233,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -245,6 +252,24 @@ def main(args):
         # features_extractor_kwargs=features_extractor_kwargs,
     )
 
+    # WandB integration
+    run = wandb.init(
+        project="acmpc",
+        group="pendulum",
+        name=log_name,
+        config=args,
+        sync_tensorboard=True,
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+    )
+
+    env = VecVideoRecorder(
+        env,
+        f"videos/{run.id}",
+        record_video_trigger=lambda x: x % 100_000 == 0,
+        video_length=200,
+    )
+
     if num_optimization_step == 0:
         policy_class = "MlpPolicy"
         policy_kwargs = dict()
@@ -256,7 +281,7 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=n_steps,
         batch_size=batch_size,
-        tensorboard_log=tb_log_folder,
+        tensorboard_log="tensorboard_logs",
         device=device,
         gamma=0.9,
         learning_rate=1e-3,
@@ -271,20 +296,24 @@ def main(args):
     model.learn(
         total_timesteps=total_timesteps,
         progress_bar=True,
-        tb_log_name=tb_log_name,
+        callback=WandbCallback(
+            verbose=2,
+            model_save_path=f"{save_name}_{run.id}",
+            model_save_freq=total_timesteps // 10,
+            gradient_save_freq=total_timesteps // 500,
+            log="all",
+        ),
     )
 
-    # Change device to cpu
-
-    model.save(save_name)
+    run.finish()
 
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=16)
+    argprs.add_argument("--n_envs", type=int, default=32)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=16 * 256)
+    argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--dt", type=float, default=0.05)
@@ -301,8 +330,7 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=3)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="dummy")
-    argprs.add_argument("--tb_log_name", type=str, default="acmpc_5_5_action")
+    argprs.add_argument("--log_name", type=str, default="acmpc_5_5_action")
     argprs.add_argument("--save_name", type=str, default="model_acmpc_5_5")
 
     args = argprs.parse_args()
