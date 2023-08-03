@@ -248,7 +248,7 @@ def main(args):
         batch_size=batch_size,
         tensorboard_log=tb_log_folder,
         device=device,
-        clip_range=0.2,
+        clip_range=0.05,
         ent_coef=0.0,
         gae_lambda=0.8,
         gamma=0.98,
@@ -278,8 +278,8 @@ if __name__ == "__main__":
     argprs.add_argument("--goal_velocity", type=float, default=0.00)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=1)
-    argprs.add_argument("--num_optimization_step", type=int, default=1)
+    argprs.add_argument("--prediction_horizon", type=int, default=4)
+    argprs.add_argument("--num_optimization_step", type=int, default=4)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
@@ -287,8 +287,8 @@ if __name__ == "__main__":
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
     argprs.add_argument("--tb_log_folder", type=str, default="dummy")
-    argprs.add_argument("--tb_log_name", type=str, default="acmpc_1_1")
-    argprs.add_argument("--save_name", type=str, default="m11")
+    argprs.add_argument("--tb_log_name", type=str, default="acmpc_4_4")
+    argprs.add_argument("--save_name", type=str, default="m4")
 
     args = argprs.parse_args()
 
