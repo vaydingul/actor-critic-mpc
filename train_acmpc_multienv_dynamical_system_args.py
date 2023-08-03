@@ -295,8 +295,8 @@ def main(args):
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
-    argprs.add_argument("--size", type=int, default=32)
-    argprs.add_argument("--n_envs", type=int, default=2)
+    argprs.add_argument("--size", type=int, default=20)
+    argprs.add_argument("--n_envs", type=int, default=32)
     argprs.add_argument("--n_steps", type=int, default=256)
     argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
@@ -323,7 +323,7 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
-    argprs.add_argument("--total_timesteps", type=int, default=100_000)
+    argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
     argprs.add_argument("--log_name", type=str, default="vanilla")
     argprs.add_argument("--save_name", type=str, default="model")
 
