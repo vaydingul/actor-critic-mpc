@@ -21,7 +21,7 @@ for i in "${!prediction_horizon_list[@]}"; do
 	echo "Seed 1"
 
 	# Run the command
-	python train_acmpc_multienv_dynamical_system_args.py --seed 42 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs_2/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models_2/${name_main}_${name}_1"
+	python train_acmpc_multienv_dynamical_system_args.py --seed 182736587126387 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}_${name}_1"
 
 	# Print the values
 	echo "$prediction_horizon"
@@ -30,5 +30,5 @@ for i in "${!prediction_horizon_list[@]}"; do
 	echo "Seed 2"
 
 	# Run the command
-	python train_acmpc_multienv_dynamical_system_args.py --seed 2023 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --tb_log_folder "$folder/tensorboard_logs_2/" --tb_log_name "${name_main}_${name}" --save_name "$folder/models_2/${name_main}_${name}_2"
+	python train_acmpc_multienv_dynamical_system_args.py --seed 387563487658734 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}_${name}_2"
 done

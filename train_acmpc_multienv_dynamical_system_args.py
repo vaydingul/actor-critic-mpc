@@ -118,7 +118,7 @@ def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
         env = gym.make(*args, **kwargs)
         env = RelativeRedundant(env)
         env = Monitor(env)
-        # env.reset(seed=seed + rank)
+        env.reset(seed=seed + rank)
         return env
 
     set_random_seed(seed)
@@ -253,11 +253,12 @@ def main(args):
         monitor_gym=True,  # auto-upload the videos of agents playing the game
         save_code=True,  # optional
     )
+
     env = VecVideoRecorder(
         env,
         f"videos/{run.id}",
-        record_video_trigger=lambda x: x % 1000 == 0,
-        video_length=100,
+        record_video_trigger=lambda x: x % 100_000 == 0,
+        video_length=200,
     )
 
     # Create model
@@ -275,9 +276,10 @@ def main(args):
     # Train model
     model.learn(
         total_timesteps=total_timesteps,
+        progress_bar=True,
         callback=WandbCallback(
             verbose=2,
-            model_save_path=f"save_name_{run.id}",
+            model_save_path=f"{save_name}_{run.id}",
             model_save_freq=total_timesteps // 10,
             gradient_save_freq=total_timesteps // 500,
             log="all",
@@ -293,10 +295,10 @@ def main(args):
 
 if __name__ == "__main__":
     argprs = ArgumentParser()
-    argprs.add_argument("--size", type=int, default=20)
+    argprs.add_argument("--size", type=int, default=32)
     argprs.add_argument("--n_envs", type=int, default=2)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=2 * 256)
+    argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
