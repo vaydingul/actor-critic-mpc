@@ -225,7 +225,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -300,9 +300,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
     argprs.add_argument("--size", type=int, default=20)
-    argprs.add_argument("--n_envs", type=int, default=32)
+    argprs.add_argument("--n_envs", type=int, default=16)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=32 * 256)
+    argprs.add_argument("--batch_size", type=int, default=16 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--agent_location_noise_level", type=float, default=0.0)
