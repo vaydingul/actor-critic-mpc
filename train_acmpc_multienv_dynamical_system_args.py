@@ -252,6 +252,7 @@ def main(args):
         n_steps=n_steps,
         batch_size=batch_size,
         device=device,
+        tensorboard_log=f"tensorboard_logs/",
     )
 
     # WandB integration
