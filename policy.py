@@ -253,9 +253,6 @@ class ActorCriticModelPredictiveControlPolicy(ActorCriticPolicy):
             action_initial = latent_pi.view(
                 batch_size, self.prediction_horizon, self.action_dim
             )
-            print("ASDAHSDJKHASDK")
-            # Add hook to compute gradients of action_initial
-            action_initial.register_hook(lambda grad: print(grad))
 
             mean_actions, _ = self.mpc(state, target, action_initial, None)
 

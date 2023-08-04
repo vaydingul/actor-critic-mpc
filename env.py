@@ -30,6 +30,9 @@ register(
     id="CartPoleContinuous-v0",
     entry_point="env:CartPoleContinuousEnv",
     max_episode_steps=500,
+    kwargs={
+        "continuous_reward": False,
+    },
 )
 
 
@@ -343,7 +346,10 @@ class CartPoleContinuousEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         "render_fps": 50,
     }
 
-    def __init__(self, render_mode: Optional[str] = None):
+    def __init__(
+        self, render_mode: Optional[str] = None, continuous_reward: bool = False
+    ):
+        self.continuous_reward = continuous_reward
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
@@ -426,6 +432,8 @@ class CartPoleContinuousEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
             or theta > self.theta_threshold_radians
         )
 
+        continuous_reward_part = -(1.0 * x**2 + 10.0 * theta**2)
+
         if not terminated:
             reward = 1.0
         elif self.steps_beyond_terminated is None:
@@ -442,6 +450,9 @@ class CartPoleContinuousEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
                 )
             self.steps_beyond_terminated += 1
             reward = 0.0
+
+        if self.continuous_reward:
+            reward += continuous_reward_part
 
         if self.render_mode == "human":
             self.render()

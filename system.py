@@ -33,6 +33,7 @@ class DynamicalSystem(nn.Module):
         self.device = device
         self._TORCH = False
 
+
     def forward(self, state, action):
         agent_location = state["agent_location"]
         agent_velocity = state["agent_velocity"]

@@ -215,6 +215,7 @@ def main(args):
             seed=seed,
             id="CartPoleContinuous-v0",
             render_mode="rgb_array",
+            continuous_reward=True,
         )
         for i in range(n_envs)
     ]
@@ -244,7 +245,7 @@ def main(args):
     # WandB integration
     run = wandb.init(
         project="acmpc",
-        group="cartpole",
+        group="cartpole_continuous_reward",
         name=log_name,
         config=args,
         sync_tensorboard=True,
@@ -262,7 +263,6 @@ def main(args):
         batch_size=batch_size,
         tensorboard_log="tensorboard_logs",
         device=device,
-        clip_range=0.05,
         ent_coef=0.0,
         gae_lambda=0.8,
         gamma=0.98,
@@ -288,9 +288,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=16)
+    argprs.add_argument("--n_envs", type=int, default=8)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=16 * 256)
+    argprs.add_argument("--batch_size", type=int, default=8 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--goal_velocity", type=float, default=0.00)

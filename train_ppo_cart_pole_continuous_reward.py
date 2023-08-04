@@ -4,14 +4,14 @@ from stable_baselines3.common.env_util import make_vec_env
 
 # Create the environment
 env_id = "CartPoleContinuous-v0"
-env_ = make_vec_env(env_id, n_envs=8)
+env_ = make_vec_env(env_id, n_envs=16, env_kwargs=dict(continuous_reward=True))
 
 # Instantiate the agent
 model = PPO(
     "MlpPolicy",
     env_,
-    batch_size=256,
-    n_steps=32,
+    batch_size=2048,
+    n_steps=128,
     verbose=1,
     clip_range=0.2,
     ent_coef=0.0,
@@ -22,7 +22,7 @@ model = PPO(
 
 
 # Train the agent
-model.learn(total_timesteps=int(1e6), progress_bar=True, tb_log_name="pendulum_ppo")
+model.learn(total_timesteps=int(1e6), progress_bar=True)
 
 # Fetch model
 vec_env = model.get_env()
