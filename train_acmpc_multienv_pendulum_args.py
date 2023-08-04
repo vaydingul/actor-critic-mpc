@@ -233,7 +233,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # # Feature extractor class
     # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -255,7 +255,7 @@ def main(args):
     # WandB integration
     run = wandb.init(
         project="acmpc",
-        group="pendulum",
+        group="pendulum_without_sde",
         name=log_name,
         config=args,
         sync_tensorboard=True,
@@ -263,14 +263,14 @@ def main(args):
         save_code=True,  # optional
     )
 
-    env = VecVideoRecorder(
-        env,
-        f"videos/{run.id}",
-        record_video_trigger=lambda x: x
-        % ((100000 // (n_envs * n_steps)) * (n_envs * n_steps))
-        == 0,
-        video_length=200,
-    )
+    # env = VecVideoRecorder(
+    #     env,
+    #     f"videos/{run.id}",
+    #     record_video_trigger=lambda x: x
+    #     % ((100000 // (n_envs * n_steps)) * (n_envs * n_steps))
+    #     == 0,
+    #     video_length=200,
+    # )
 
     if num_optimization_step == 0:
         policy_class = "MlpPolicy"
@@ -290,8 +290,8 @@ def main(args):
         gae_lambda=0.95,
         ent_coef=0.0,
         clip_range=0.2,
-        use_sde=True,
-        sde_sample_freq=4,
+        # use_sde=True,
+        # sde_sample_freq=4,
     )
 
     # Train model

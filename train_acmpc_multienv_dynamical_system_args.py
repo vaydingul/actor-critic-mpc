@@ -225,7 +225,7 @@ def main(args):
         )
         for i in range(n_envs)
     ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
+    env = SubprocVecEnv(env_list) if n_envs > 1 else env_list[0]()
 
     # Feature extractor class
     features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
@@ -254,14 +254,12 @@ def main(args):
         save_code=True,  # optional
     )
 
-    env = VecVideoRecorder(
-        env,
-        f"videos/{run.id}",
-        record_video_trigger=lambda x: x
-        % ((100000 // (n_envs * n_steps)) * (n_envs * n_steps))
-        == 0,
-        video_length=200,
-    )
+    # env = VecVideoRecorder(
+    #     env,
+    #     f"videos/dynamical_system/{run.id}",
+    #     record_video_trigger=lambda x: x % ((100000 // n_steps) * n_steps) == 0,
+    #     video_length=200,
+    # )
 
     if num_optimization_step == 0:
         policy_class = "MlpPolicy"
@@ -293,10 +291,6 @@ def main(args):
     )
 
     run.finish()
-
-    # Change device to cpu
-
-    # model.save(save_name)
 
 
 if __name__ == "__main__":
