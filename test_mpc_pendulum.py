@@ -135,8 +135,8 @@ mpc = ModelPredictiveControlWithoutOptimizer(
     system,
     cost,
     action_size=1,
-    prediction_horizon=10,
-    num_optimization_step=10,
+    prediction_horizon=5,
+    num_optimization_step=40,
     lr=1.0,
     device="cpu",
 )
@@ -152,19 +152,18 @@ state, target = obs_to_state_target(observation)
 while True:
     action, cost_value = mpc(state, target)
 
-    print(action)
+    # print(action)
 
     action_ = action.clone().detach().numpy()
     action_selected = action_[:, 0]
-    print(action_selected.shape)
-    print(f"Action: {action_selected}")
-    print(f"Cost: {cost_value}")
+    # print(action_selected.shape)
+    # print(f"Action: {action_selected}")
+    # print(f"Cost: {cost_value}")
     observation, reward, _, information = env.step(action_selected)
-    print(reward)
+    # print(reward)
     observation = torch.Tensor(observation.copy())
-
+    print(f"State: {observation}")
     state, target = obs_to_state_target(observation)
-
 
     # time.sleep(0.1)
     env.render("human")
