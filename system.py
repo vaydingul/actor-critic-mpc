@@ -33,7 +33,6 @@ class DynamicalSystem(nn.Module):
         self.device = device
         self._TORCH = False
 
-
     def forward(self, state, action):
         agent_location = state["agent_location"]
         agent_velocity = state["agent_velocity"]
@@ -300,3 +299,228 @@ class CartPole(nn.Module):
         )
 
         return next_state
+
+
+class Acrobot(nn.Module):
+    dt = 0.2
+
+    LINK_LENGTH_1 = 1.0  # [m]
+    LINK_LENGTH_2 = 1.0  # [m]
+    LINK_MASS_1 = 1.0  #: [kg] mass of link 1
+    LINK_MASS_2 = 1.0  #: [kg] mass of link 2
+    LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
+    LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
+    LINK_MOI = 1.0  #: moments of inertia for both links
+
+    MAX_VEL_1 = 4 * pi
+    MAX_VEL_2 = 9 * pi
+
+    AVAIL_TORQUE = [-1.0, 0.0, +1]
+
+    torque_noise_max = 0.0
+
+    SCREEN_DIM = 500
+
+    #: use dynamics equations from the nips paper or the book
+    book_or_nips = "book"
+    action_arrow = None
+    domain_fig = None
+    actions_num = 3
+
+    def __init__(self):
+        super(Acrobot, self).__init__()
+
+        self._TORCH = False
+
+    def forward(self, state, action):
+        theta_1 = state["theta_1"]
+        theta_2 = state["theta_2"]
+        theta_dot_1 = state["theta_dot_1"]
+        theta_dot_2 = state["theta_dot_2"]
+
+        self._TORCH = isinstance(theta_1, torch.Tensor)
+
+        if self._TORCH:
+            augment = lambda arr, dim: torch.cat(arr, dim=dim)
+        else:
+            augment = lambda arr, dim: np.concatenate(arr, axis=dim)
+
+        torque = action
+
+        state_augmented = augment(
+            arr=[theta_1, theta_2, theta_dot_1, theta_dot_2, torque], dim=1
+        )
+
+        next_state = self.rk4(self._dsdt, state_augmented, [0, self.dt])
+
+        next_state[0] = self.wrap(next_state[0], -np.pi, np.pi)
+        next_state[1] = self.wrap(next_state[1], -np.pi, np.pi)
+        next_state[2] = self.bound(next_state[2], -self.MAX_VEL_1, self.MAX_VEL_1)
+        next_state[3] = self.bound(next_state[3], -self.MAX_VEL_2, self.MAX_VEL_2)
+
+        next_state = dict(
+            theta_1=next_state[..., 0],
+            theta_2=next_state[..., 1],
+            theta_dot_1=next_state[..., 2],
+            theta_dot_2=next_state[..., 3],
+        )
+
+    def _dsdt(self, s_augmented):
+        if self._TORCH:
+            cos = torch.cos
+            sin = torch.sin
+        else:
+            cos = np.cos
+            sin = np.sin
+
+        m1 = self.LINK_MASS_1
+        m2 = self.LINK_MASS_2
+        l1 = self.LINK_LENGTH_1
+        lc1 = self.LINK_COM_POS_1
+        lc2 = self.LINK_COM_POS_2
+        I1 = self.LINK_MOI
+        I2 = self.LINK_MOI
+        g = 9.8
+        a = s_augmented[..., -1]
+        s = s_augmented[..., :-1]
+        theta1 = s[..., 0]
+        theta2 = s[..., 1]
+        dtheta1 = s[..., 2]
+        dtheta2 = s[..., 3]
+        d1 = (
+            m1 * lc1**2
+            + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * cos(theta2))
+            + I1
+            + I2
+        )
+        d2 = m2 * (lc2**2 + l1 * lc2 * cos(theta2)) + I2
+        phi2 = m2 * lc2 * g * cos(theta1 + theta2 - np.pi / 2.0)
+        phi1 = (
+            -m2 * l1 * lc2 * dtheta2**2 * sin(theta2)
+            - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * sin(theta2)
+            + (m1 * lc1 + m2 * l1) * g * cos(theta1 - np.pi / 2)
+            + phi2
+        )
+        if self.book_or_nips == "nips":
+            # the following line is consistent with the description in the
+            # paper
+            ddtheta2 = (a + d2 / d1 * phi1 - phi2) / (m2 * lc2**2 + I2 - d2**2 / d1)
+        else:
+            # the following line is consistent with the java implementation and the
+            # book
+            ddtheta2 = (
+                a + d2 / d1 * phi1 - m2 * l1 * lc2 * dtheta1**2 * sin(theta2) - phi2
+            ) / (m2 * lc2**2 + I2 - d2**2 / d1)
+        ddtheta1 = -(d2 * ddtheta2 + phi1) / d1
+        return dtheta1, dtheta2, ddtheta1, ddtheta2, 0.0
+
+    def wrap(self, x, m, M):
+        """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which
+        truncates, ``wrap()`` wraps x around the coordinate system defined by m,M.\n
+        For example, m = -180, M = 180 (degrees), x = 360 --> returns 0.
+
+        Args:
+            x: a scalar
+            m: minimum possible value in range
+            M: maximum possible value in range
+
+        Returns:
+            x: a scalar, wrapped
+        """
+        if self._TORCH:
+            float = torch.Tensor.float
+        else:
+            float = lambda: np.ndarray.astype(np.float32)
+
+        diff = M - m
+        x = x - (x > M).float() * diff
+        x = x + (x < m).float() * diff
+        return x
+
+    def bound(self, x, m, M=None):
+        """Either have m as scalar, so bound(x,m,M) which returns m <= x <= M *OR*
+        have m as length 2 vector, bound(x,m, <IGNORED>) returns m[0] <= x <= m[1].
+
+        Args:
+            x: scalar
+            m: The lower bound
+            M: The upper bound
+
+        Returns:
+            x: scalar, bound between min (m) and Max (M)
+        """
+        if self._TORCH:
+            min = torch.min
+            max = torch.max
+        else:
+            min = np.min
+            max = np.max
+
+        if M is None:
+            M = m[1]
+            m = m[0]
+        # bound x between min (m) and Max (M)
+        return torch.min(torch.max(x, m), M)
+
+    def rk4(self, derivs, y0, t):
+        """
+        Integrate 1-D or N-D system of ODEs using 4-th order Runge-Kutta.
+
+        Example for 2D system:
+
+            >>> def derivs(x):
+            ...     d1 =  x[0] + 2*x[1]
+            ...     d2 =  -3*x[0] + 4*x[1]
+            ...     return d1, d2
+
+            >>> dt = 0.0005
+            >>> t = np.arange(0.0, 2.0, dt)
+            >>> y0 = (1,2)
+            >>> yout = rk4(derivs, y0, t)
+
+        Args:
+            derivs: the derivative of the system and has the signature ``dy = derivs(yi)``
+            y0: initial state vector
+            t: sample times
+
+        Returns:
+            yout: Runge-Kutta approximation of the ODE
+        """
+
+        if self._TORCH:
+            zeros = torch.zeros
+            asarray = torch.Tensor
+            float = torch.Tensor.float
+        else:
+            zeros = np.zeros
+            asarray = np.asarray
+            float = np.float32
+
+        try:
+            batch_size, Ny = y0.shape
+        except TypeError:
+            yout = zeros(
+                (
+                    batch_size,
+                    len(t),
+                ),
+                float,
+            )
+        else:
+            yout = zeros((batch_size, len(t), Ny), float)
+
+        yout[:, 0] = y0
+
+        for i in np.arange(len(t) - 1):
+            this = t[i]
+            dt = t[i + 1] - this
+            dt2 = dt / 2.0
+            y0 = yout[:, i]
+
+            k1 = derivs(y0)
+            k2 = derivs(y0 + dt2 * k1)
+            k3 = derivs(y0 + dt2 * k2)
+            k4 = derivs(y0 + dt * k3)
+            yout[:, i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
+        # We only care about the final timestep and we cleave off action value which will be zero
+        return yout[:, -1][:4]
