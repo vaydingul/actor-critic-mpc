@@ -5,135 +5,19 @@ from policy import (
 )
 import gymnasium as gym
 from stable_baselines3 import PPO
-from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import VecCheckNan
-from stable_baselines3.common.vec_env import DummyVecEnv
 
+
+from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.env_util import make_vec_env
 from system import MountainCar
 from mpc import ModelPredictiveControlWithoutOptimizer
-from typing import Callable, Any
-
-from torch import nn
-import torch
-import numpy as np
 
 
-def cost(predicted_state, target_state, action=None, cost_dict=None):
-    batch_size, prediction_horizon, _ = predicted_state["position"].shape
-    device = predicted_state["position"].device
-
-    predicted_position = predicted_state["position"]
-    predicted_velocity = predicted_state["velocity"]
-
-    target_position = (
-        target_state["position"].unsqueeze(1).expand(-1, prediction_horizon, -1)
-    )
-    target_velocity = (
-        target_state["velocity"].unsqueeze(1).expand(-1, prediction_horizon, -1)
-    )
-
-    if cost_dict is None:
-        cost_dict = dict(
-            position_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.1,
-            velocity_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 1.0,
-            action_weight=torch.ones(batch_size, prediction_horizon, 1, device=device)
-            * 0.01,
-        )
-
-    cost = (
-        (
-            torch.nn.functional.mse_loss(
-                predicted_position,
-                target_position,
-                reduction="none",
-            )
-            * cost_dict["position_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    cost += (
-        (
-            torch.nn.functional.mse_loss(
-                torch.abs(predicted_velocity),
-                target_velocity,
-                reduction="none",
-            )
-            * cost_dict["velocity_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    cost += (
-        (
-            torch.norm(
-                action,
-                p=2,
-                dim=-1,
-                keepdim=True,
-            )
-            * cost_dict["action_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    return cost
-
-
-def obs_to_state_target(obs) -> tuple[Any, Any]:
-    position = obs[..., 0].unsqueeze(-1)
-    velocity = obs[..., 1].unsqueeze(-1)
-
-    state = dict(
-        position=position,
-        velocity=velocity,
-    )
-
-    target = dict(
-        position=torch.ones_like(position) * 0.45,
-        velocity=torch.ones_like(velocity) * 2.0,
-    )
-
-    return state, target
-
-
-def make_env(rank: int, seed: int = 0, *args, **kwargs) -> Callable:
-    """
-    Utility function for multiprocessed env.
-
-    :param env_id: (str) the environment ID
-    :param num_env: (int) the number of environment you wish to have in subprocesses
-    :param seed: (int) the inital seed for RNG
-    :param rank: (int) index of the subprocess
-    :return: (Callable)
-    """
-
-    def _init() -> gym.Env:
-        env = gym.make(*args, **kwargs)
-        env = Monitor(env)
-
-        env.reset(seed=seed + rank)
-        return env
-
-    set_random_seed(seed)
-    return _init
-
-
-def str_2_bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise ValueError("Boolean value expected.")
+from wandb.integration.sb3 import WandbCallback
+import wandb
+from utils import str_2_bool
+from costs import mountain_car_cost, mountain_car_obs_to_state_target
+from wrapper import GaussianNoiseWrapper
 
 
 def main(args):
@@ -142,6 +26,8 @@ def main(args):
     batch_size = args.batch_size
     device = args.device
     seed = args.seed
+    gaussian_noise_scale = args.gaussian_noise_scale
+
     # System parameters
     goal_velocity = args.goal_velocity
 
@@ -158,8 +44,8 @@ def main(args):
 
     # Learning parameters
     total_timesteps = args.total_timesteps
-    tb_log_folder = args.tb_log_folder if args.tb_log_folder != "" else None
-    tb_log_name = args.tb_log_name
+
+    log_name = args.log_name
     save_name = args.save_name
 
     # Create system
@@ -169,7 +55,7 @@ def main(args):
     mpc_class = ModelPredictiveControlWithoutOptimizer
     mpc_kwargs = dict(
         system=system,
-        cost=cost,
+        cost=mountain_car_cost,
         action_size=action_size,
         prediction_horizon=prediction_horizon,
         num_optimization_step=num_optimization_step,
@@ -178,41 +64,46 @@ def main(args):
         device=device,
     )
 
-    env_list = [
-        make_env(
-            rank=i,
-            seed=seed,
-            id="MountainCarContinuous-v0",
-            render_mode="rgb_array",
-        )
-        for i in range(n_envs)
-    ]
-    env = DummyVecEnv(env_list) if n_envs > 1 else env_list[0]()
-
-
-    # # Feature extractor class
-    # features_extractor_class = ActorCriticModelPredictiveControlFeatureExtractor
-    # features_extractor_kwargs = dict(input_dim=4, features_dim=4)
+    env_id = "MountainCarContinuous-v0"
+    env = make_vec_env(
+        env_id,
+        n_envs=n_envs,
+        seed=seed,
+        vec_env_cls=SubprocVecEnv,
+        wrapper_class=GaussianNoiseWrapper,
+        wrapper_kwargs=dict(std_diff_scale=gaussian_noise_scale),
+        env_kwargs=dict(goal_velocity=goal_velocity),
+    )
+    env.seed(seed)
 
     # Policy
-    policy_class = ActorCriticModelPredictiveControlPolicy
-    policy_kwargs = dict(
-        mpc_class=mpc_class,
-        mpc_kwargs=mpc_kwargs,
-        predict_action=predict_action,
-        predict_cost=predict_cost,
-        num_cost_terms=num_cost_terms,
-        obs_to_state_target=obs_to_state_target,
-        # features_extractor_class=features_extractor_class,
-        # features_extractor_kwargs=features_extractor_kwargs,
-        log_std_init=-3.29,
-    )
-
     if num_optimization_step == 0:
         policy_class = "MlpPolicy"
         policy_kwargs = dict(
             log_std_init=-3.29,
         )
+    else:
+        policy_class = ActorCriticModelPredictiveControlPolicy
+        policy_kwargs = dict(
+            mpc_class=mpc_class,
+            mpc_kwargs=mpc_kwargs,
+            predict_action=predict_action,
+            predict_cost=predict_cost,
+            num_cost_terms=num_cost_terms,
+            obs_to_state_target=mountain_car_obs_to_state_target,
+            log_std_init=-3.29,
+        )
+
+    # WandB integration
+    run = wandb.init(
+        project="acmpc",
+        group="dynamical_system",
+        name=log_name,
+        config=args,
+        sync_tensorboard=True,
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+    )
 
     # Create model
     model = PPO(
@@ -222,7 +113,8 @@ def main(args):
         policy_kwargs=policy_kwargs,
         n_steps=n_steps,
         batch_size=batch_size,
-        tensorboard_log=tb_log_folder,
+        tensorboard_log=f"tensorboard_logs/",
+        seed=seed,
         device=device,
         clip_range=0.1,
         ent_coef=0.00429,
@@ -238,12 +130,16 @@ def main(args):
     model.learn(
         total_timesteps=total_timesteps,
         progress_bar=True,
-        tb_log_name=tb_log_name,
+        callback=WandbCallback(
+            verbose=2,
+            model_save_path=f"{save_name}_{run.id}",
+            model_save_freq=total_timesteps // 10,
+            gradient_save_freq=total_timesteps // 500,
+            log="all",
+        ),
     )
 
-    # Change device to cpu
-
-    model.save(save_name)
+    run.finish()
 
 
 if __name__ == "__main__":
@@ -254,6 +150,8 @@ if __name__ == "__main__":
     argprs.add_argument("--batch_size", type=int, default=16 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
+    argprs.add_argument("--gaussian_noise_scale", type=float, default=0.0)
+
     argprs.add_argument("--goal_velocity", type=float, default=0.00)
 
     argprs.add_argument("--action_size", type=int, default=1)
@@ -265,9 +163,8 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--tb_log_folder", type=str, default="")
-    argprs.add_argument("--tb_log_name", type=str, default="")
-    argprs.add_argument("--save_name", type=str, default="")
+    argprs.add_argument("--log_name", type=str, default="vanilla")
+    argprs.add_argument("--save_name", type=str, default="model")
 
     args = argprs.parse_args()
 

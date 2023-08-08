@@ -8,8 +8,7 @@ from stable_baselines3.common.env_util import make_vec_env
 import torch
 import numpy as np
 
-
-
+# torch.autograd.set_detect_anomaly(True)
 
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
@@ -52,53 +51,72 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
             * 0.0,
         )
 
+    # cost = (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             wrap(predicted_theta_1),
+    #             wrap(target_theta_1),
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_1_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             wrap(predicted_theta_2),
+    #             wrap(target_theta_2),
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_2_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             predicted_theta_1_dot,
+    #             target_theta_1_dot,
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_1_dot_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    # cost += (
+    #     (
+    #         torch.nn.functional.mse_loss(
+    #             predicted_theta_2_dot,
+    #             target_theta_2_dot,
+    #             reduction="none",
+    #         )
+    #         * cost_dict["theta_2_dot_weight"]
+    #     )
+    #     .mean(1)
+    #     .sum()
+    # )
+
+    predicted_height = -(
+        torch.cos(predicted_theta_1) + torch.cos(predicted_theta_1 + predicted_theta_2)
+    )
+
+    target_height = torch.tensor(1.0)
+
     cost = (
         (
             torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta_1),
-                angle_normalize(target_theta_1),
+                predicted_height,
+                target_height,
                 reduction="none",
             )
-            * cost_dict["theta_1_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    cost += (
-        (
-            torch.nn.functional.mse_loss(
-                angle_normalize(predicted_theta_2),
-                angle_normalize(target_theta_2),
-                reduction="none",
-            )
-            * cost_dict["theta_2_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    cost += (
-        (
-            torch.nn.functional.mse_loss(
-                predicted_theta_1_dot,
-                target_theta_1_dot,
-                reduction="none",
-            )
-            * cost_dict["theta_1_dot_weight"]
-        )
-        .mean(1)
-        .sum()
-    )
-
-    cost += (
-        (
-            torch.nn.functional.mse_loss(
-                predicted_theta_2_dot,
-                target_theta_2_dot,
-                reduction="none",
-            )
-            * cost_dict["theta_2_dot_weight"]
+            * 1.0
         )
         .mean(1)
         .sum()
@@ -160,8 +178,8 @@ mpc = ModelPredictiveControlWithoutOptimizer(
     system,
     cost,
     action_size=1,
-    prediction_horizon=40,
-    num_optimization_step=10,
+    prediction_horizon=5,
+    num_optimization_step=5,
     lr=1.0,
     device="cpu",
 )

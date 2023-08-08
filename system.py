@@ -333,50 +333,32 @@ class Acrobot(nn.Module):
         self._TORCH = False
 
     def forward(self, state, action):
-        theta_1 = state["theta_1"]
-        theta_2 = state["theta_2"]
-        theta_1_dot = state["theta_1_dot"]
-        theta_2_dot = state["theta_2_dot"]
+        theta_1 = state["theta_1"].view(-1, 1)
+        theta_2 = state["theta_2"].view(-1, 1)
+        theta_1_dot = state["theta_1_dot"].view(-1, 1)
+        theta_2_dot = state["theta_2_dot"].view(-1, 1)
 
-        self._TORCH = isinstance(theta_1, torch.Tensor)
+        torque = action.view(-1, 1)
 
-        if self._TORCH:
-            augment = lambda arr, dim: torch.cat(arr, dim=dim)
-        else:
-            augment = lambda arr, dim: np.cat(arr, axis=dim)
-
-        torque = action
-
-        state_augmented = augment(
-            arr=[theta_1, theta_2, theta_1_dot, theta_2_dot, torque], dim=1
+        state_augmented = torch.stack(
+            [theta_1, theta_2, theta_1_dot, theta_2_dot, torque], dim=1
         )
 
-        next_state = self.rk4(self._dsdt, state_augmented, [0, self.dt])
+        next_state = rk4(self._dsdt, state_augmented, [0, self.dt])
 
-        next_state[..., 0] = self.wrap(next_state[..., 0], -np.pi, np.pi)
-        next_state[..., 1] = self.wrap(next_state[..., 1], -np.pi, np.pi)
-        next_state[..., 2] = self.bound(
-            next_state[..., 2], -self.MAX_VEL_1, self.MAX_VEL_1
-        )
-        next_state[..., 3] = self.bound(
-            next_state[..., 3], -self.MAX_VEL_2, self.MAX_VEL_2
-        )
+        next_state[:, 0] = wrap(next_state[:, 0], -np.pi, np.pi)
+        next_state[:, 1] = wrap(next_state[:, 1], -np.pi, np.pi)
+        next_state[:, 2] = bound(next_state[:, 2], -self.MAX_VEL_1, self.MAX_VEL_1)
+        next_state[:, 3] = bound(next_state[:, 3], -self.MAX_VEL_2, self.MAX_VEL_2)
 
         return dict(
-            theta_1=next_state[..., 0].unsqueeze(-1),
-            theta_2=next_state[..., 1].unsqueeze(-1),
-            theta_1_dot=next_state[..., 2].unsqueeze(-1),
-            theta_2_dot=next_state[..., 3].unsqueeze(-1),
+            theta_1=next_state[:, 0],
+            theta_2=next_state[:, 1],
+            theta_1_dot=next_state[:, 2],
+            theta_2_dot=next_state[:, 3],
         )
 
     def _dsdt(self, s_augmented):
-        if self._TORCH:
-            cos = torch.cos
-            sin = torch.sin
-        else:
-            cos = np.cos
-            sin = np.sin
-
         m1 = self.LINK_MASS_1
         m2 = self.LINK_MASS_2
         l1 = self.LINK_LENGTH_1
@@ -385,24 +367,24 @@ class Acrobot(nn.Module):
         I1 = self.LINK_MOI
         I2 = self.LINK_MOI
         g = 9.8
-        a = s_augmented[..., -1]
-        s = s_augmented[..., :-1]
-        theta1 = s[..., 0]
-        theta2 = s[..., 1]
-        dtheta1 = s[..., 2]
-        dtheta2 = s[..., 3]
+        a = s_augmented[:, -1]
+        s = s_augmented[:, :-1]
+        theta1 = s[:, 0]
+        theta2 = s[:, 1]
+        dtheta1 = s[:, 2]
+        dtheta2 = s[:, 3]
         d1 = (
             m1 * lc1**2
-            + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * cos(theta2))
+            + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * torch.cos(theta2))
             + I1
             + I2
         )
-        d2 = m2 * (lc2**2 + l1 * lc2 * cos(theta2)) + I2
-        phi2 = m2 * lc2 * g * cos(theta1 + theta2 - np.pi / 2.0)
+        d2 = m2 * (lc2**2 + l1 * lc2 * torch.cos(theta2)) + I2
+        phi2 = m2 * lc2 * g * torch.cos(theta1 + theta2 - np.pi / 2.0)
         phi1 = (
-            -m2 * l1 * lc2 * dtheta2**2 * sin(theta2)
-            - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * sin(theta2)
-            + (m1 * lc1 + m2 * l1) * g * cos(theta1 - np.pi / 2)
+            -m2 * l1 * lc2 * dtheta2**2 * torch.sin(theta2)
+            - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * torch.sin(theta2)
+            + (m1 * lc1 + m2 * l1) * g * torch.cos(theta1 - np.pi / 2)
             + phi2
         )
         if self.book_or_nips == "nips":
@@ -413,100 +395,101 @@ class Acrobot(nn.Module):
             # the following line is consistent with the java implementation and the
             # book
             ddtheta2 = (
-                a + d2 / d1 * phi1 - m2 * l1 * lc2 * dtheta1**2 * sin(theta2) - phi2
+                a
+                + d2 / d1 * phi1
+                - m2 * l1 * lc2 * dtheta1**2 * torch.sin(theta2)
+                - phi2
             ) / (m2 * lc2**2 + I2 - d2**2 / d1)
         ddtheta1 = -(d2 * ddtheta2 + phi1) / d1
-        return dtheta1, dtheta2, ddtheta1, ddtheta2, 0.0
+        return (dtheta1, dtheta2, ddtheta1, ddtheta2, torch.zeros_like(dtheta1))
 
-    def wrap(self, x, m, M):
-        """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which
-        truncates, ``wrap()`` wraps x around the coordinate system defined by m,M.\n
-        For example, m = -180, M = 180 (degrees), x = 360 --> returns 0.
 
-        Args:
-            x: a scalar
-            m: minimum possible value in range
-            M: maximum possible value in range
+def wrap(x, m, M):
+    """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which
+    truncates, ``wrap()`` wraps x around the coordinate system defined by m,M.\n
+    For example, m = -180, M = 180 (degrees), x = 360 --> returns 0.
 
-        Returns:
-            x: a scalar, wrapped
-        """
+    Args:
+        x: a scalar
+        m: minimum possible value in range
+        M: maximum possible value in range
 
-        diff = M - m
-        x = x - (x > M).float() * diff
-        x = x + (x < m).float() * diff
-        return x
+    Returns:
+        x: a scalar, wrapped
+    """
 
-    def bound(self, x, m, M):
-        """Either have m as scalar, so bound(x,m,M) which returns m <= x <= M *OR*
-        have m as length 2 vector, bound(x,m, <IGNORED>) returns m[0] <= x <= m[1].
+    diff = M - m
+    x = x - (x > M).float() * diff
+    x = x + (x < m).float() * diff
+    return x
 
-        Args:
-            x: scalar
-            m: The lower bound
-            M: The upper bound
 
-        Returns:
-            x: scalar, bound between min (m) and Max (M)
-        """
+def bound(x, m, M):
+    """Either have m as scalar, so bound(x,m,M) which returns m <= x <= M *OR*
+    have m as length 2 vector, bound(x,m, <IGNORED>) returns m[0] <= x <= m[1].
 
-        if self._TORCH:
-            clamp = torch.clamp_
-        else:
-            clamp = np.clip
+    Args:
+        x: scalar
+        m: The lower bound
+        M: The upper bound
 
-        return clamp(x, m, M)
+    Returns:
+        x: scalar, bound between min (m) and Max (M)
+    """
 
-    def rk4(self, derivs, y0, t):
-        """
-        Integrate 1-D or N-D system of ODEs using 4-th order Runge-Kutta.
+    return torch.clamp_(x, m, M)
 
-        Example for 2D system:
 
-            >>> def derivs(x):
-            ...     d1 =  x[0] + 2*x[1]
-            ...     d2 =  -3*x[0] + 4*x[1]
-            ...     return d1, d2
+def rk4(derivs, y0, t):
+    """
+    Integrate 1-D or N-D system of ODEs using 4-th order Runge-Kutta.
 
-            >>> dt = 0.0005
-            >>> t = np.arange(0.0, 2.0, dt)
-            >>> y0 = (1,2)
-            >>> yout = rk4(derivs, y0, t)
+    Example for 2D system:
 
-        Args:
-            derivs: the derivative of the system and has the signature ``dy = derivs(yi)``
-            y0: initial state vector
-            t: sample times
+        >>> def derivs(x):
+        ...     d1 =  x[0] + 2*x[1]
+        ...     d2 =  -3*x[0] + 4*x[1]
+        ...     return d1, d2
 
-        Returns:
-            yout: Runge-Kutta approximation of the ODE
-        """
+        >>> dt = 0.0005
+        >>> t = np.arange(0.0, 2.0, dt)
+        >>> y0 = (1,2)
+        >>> yout = rk4(derivs, y0, t)
 
-        try:
-            batch_size, Ny = y0.shape
-        except TypeError:
-            yout = torch.zeros(
-                (
-                    batch_size,
-                    len(t),
-                ),
-                dtype=torch.float32,
-            )
-        else:
-            yout = torch.zeros((batch_size, len(t), Ny), dtype=torch.float32)
+    Args:
+        derivs: the derivative of the system and has the signature ``dy = derivs(yi)``
+        y0: initial state vector
+        t: sample times
 
-        yout[:, 0] = y0
+    Returns:
+        yout: Runge-Kutta approximation of the ODE
+    """
 
-        for i in np.arange(len(t) - 1):
-            this = t[i]
-            dt = t[i + 1] - this
-            dt2 = dt / 2.0
-            y0 = yout[:, i]
+    try:
+        batch_size, Ny, _ = y0.shape
+    except TypeError:
+        yout = torch.zeros(
+            (
+                batch_size,
+                len(t),
+            ),
+            dtype=torch.float32,
+        )
+    else:
+        yout = torch.zeros((batch_size, len(t), Ny, 1), dtype=torch.float32)
 
-            k1 = torch.as_tensor(derivs(y0))
-            k2 = torch.as_tensor(derivs(y0 + dt2 * k1))
-            k3 = torch.as_tensor(derivs(y0 + dt2 * k2))
-            k4 = torch.as_tensor(derivs(y0 + dt * k3))
-            yout[:, i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
-        # We only care about the final timestep and we cleave off action value which will be zero
-        return yout[:, -1][:4]
+    yout[:, 0] = y0
+
+    for i in np.arange(len(t) - 1):
+        this = t[i]
+        dt = t[i + 1] - this
+        dt2 = dt / 2.0
+        y0 = yout[:, i].clone()
+
+        k1 = torch.stack(derivs(y0), dim=1)
+        k2 = torch.stack(derivs(y0 + dt2 * k1), dim=1)
+        k3 = torch.stack(derivs(y0 + dt2 * k2), dim=1)
+        k4 = torch.stack(derivs(y0 + dt * k3), dim=1)
+        yout[:, i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
+    # We only care about the final timestep and we cleave off action value which will be zero
+    return yout[:, -1, :4]

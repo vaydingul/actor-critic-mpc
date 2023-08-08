@@ -19,6 +19,17 @@ def make_action_space():
     return spaces.Box(-10.0, 10.0, shape=(2,), dtype=float)
 
 
+def str_2_bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise ValueError("Boolean value expected.")
+
+
 def render_frame(
     size,
     window_size,

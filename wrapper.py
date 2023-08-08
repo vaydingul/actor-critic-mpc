@@ -50,3 +50,22 @@ class ExtractRelative(ObservationWrapper):
 
     def observation(self, observation) -> np.ndarray:
         return observation[:4]
+
+
+class GaussianNoiseWrapper(ObservationWrapper):
+    """
+    Inherit the existent observation space and add Gaussian noise to it.
+    """
+
+    def __init__(self, env: gym.Env, std_diff_ratio: float = 0.1):
+        super().__init__(env)
+
+        # Determine mu based on the low and high values of the observation space
+        self.mu = (self.observation_space.high + self.observation_space.low) / 2.0
+        # Determine std based on the difference between low and high values of the observation space
+        self.std = (
+            self.observation_space.high - self.observation_space.low
+        ) * std_diff_ratio
+
+    def observation(self, observation) -> np.ndarray:
+        return observation + np.random.normal(self.mu, self.std, size=observation.shape)
