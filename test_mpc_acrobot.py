@@ -8,7 +8,8 @@ from stable_baselines3.common.env_util import make_vec_env
 import torch
 import numpy as np
 
-torch.autograd.set_detect_anomaly(True)
+
+
 
 def cost(predicted_state, target_state, action=None, cost_dict=None):
     batch_size, prediction_horizon, _ = predicted_state["theta_1"].shape

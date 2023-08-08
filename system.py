@@ -450,7 +450,12 @@ class Acrobot(nn.Module):
             x: scalar, bound between min (m) and Max (M)
         """
 
-        return torch.clamp_(x, m, M)
+        if self._TORCH:
+            clamp = torch.clamp_
+        else:
+            clamp = np.clip
+
+        return clamp(x, m, M)
 
     def rk4(self, derivs, y0, t):
         """
