@@ -161,5 +161,7 @@ cython_debug/
 
 
 wandb/
-tensorboard_logs/
+
 models/
+
+tensorboard_logs/
