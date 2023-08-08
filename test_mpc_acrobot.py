@@ -1,12 +1,13 @@
 from typing import Any
 import env
 from mpc import ModelPredictiveControlWithoutOptimizer
-from system import Acrobot, angle_normalize
+from system import Acrobot
 
 # Import make_vec_env to allow parallelization
 from stable_baselines3.common.env_util import make_vec_env
 import torch
 import numpy as np
+
 
 
 
@@ -116,19 +117,6 @@ def cost(predicted_state, target_state, action=None, cost_dict=None):
         .mean(1)
         .sum()
     )
-
-    # cost = (
-    #     torch.norm(
-    #         - torch.cos(predicted_theta_1)
-    #         - torch.cos(predicted_theta_2 + predicted_theta_1)
-    #         - 1,
-    #         p=2,
-    #         dim=-1,
-    #         keepdim=True,
-    #     )
-    #     .mean(1)
-    #     .sum()
-    # )
 
     return cost
 

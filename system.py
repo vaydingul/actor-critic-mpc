@@ -482,27 +482,18 @@ class Acrobot(nn.Module):
             yout: Runge-Kutta approximation of the ODE
         """
 
-        if self._TORCH:
-            zeros = torch.zeros
-            asarray = torch.as_tensor
-            float_ = torch.float32
-        else:
-            zeros = np.zeros
-            asarray = np.asarray
-            float_ = np.float32
-
         try:
             batch_size, Ny = y0.shape
         except TypeError:
-            yout = zeros(
+            yout = torch.zeros(
                 (
                     batch_size,
                     len(t),
                 ),
-                dtype=float_,
+                dtype=torch.float32,
             )
         else:
-            yout = zeros((batch_size, len(t), Ny), dtype=float_)
+            yout = torch.zeros((batch_size, len(t), Ny), dtype=torch.float32)
 
         yout[:, 0] = y0
 
@@ -512,10 +503,10 @@ class Acrobot(nn.Module):
             dt2 = dt / 2.0
             y0 = yout[:, i]
 
-            k1 = asarray(derivs(y0))
-            k2 = asarray(derivs(y0 + dt2 * k1))
-            k3 = asarray(derivs(y0 + dt2 * k2))
-            k4 = asarray(derivs(y0 + dt * k3))
+            k1 = torch.as_tensor(derivs(y0))
+            k2 = torch.as_tensor(derivs(y0 + dt2 * k1))
+            k3 = torch.as_tensor(derivs(y0 + dt2 * k2))
+            k4 = torch.as_tensor(derivs(y0 + dt * k3))
             yout[:, i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
         # We only care about the final timestep and we cleave off action value which will be zero
         return yout[:, -1][:4]
