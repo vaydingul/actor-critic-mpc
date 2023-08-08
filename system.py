@@ -312,8 +312,8 @@ class Acrobot(nn.Module):
     LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
     LINK_MOI = 1.0  #: moments of inertia for both links
 
-    MAX_VEL_1 = 4 * pi
-    MAX_VEL_2 = 9 * pi
+    MAX_VEL_1 = 4 * np.pi
+    MAX_VEL_2 = 9 * np.pi
 
     AVAIL_TORQUE = [-1.0, 0.0, +1]
 
@@ -335,34 +335,38 @@ class Acrobot(nn.Module):
     def forward(self, state, action):
         theta_1 = state["theta_1"]
         theta_2 = state["theta_2"]
-        theta_dot_1 = state["theta_dot_1"]
-        theta_dot_2 = state["theta_dot_2"]
+        theta_1_dot = state["theta_1_dot"]
+        theta_2_dot = state["theta_2_dot"]
 
         self._TORCH = isinstance(theta_1, torch.Tensor)
 
         if self._TORCH:
             augment = lambda arr, dim: torch.cat(arr, dim=dim)
         else:
-            augment = lambda arr, dim: np.concatenate(arr, axis=dim)
+            augment = lambda arr, dim: np.cat(arr, axis=dim)
 
         torque = action
 
         state_augmented = augment(
-            arr=[theta_1, theta_2, theta_dot_1, theta_dot_2, torque], dim=1
+            arr=[theta_1, theta_2, theta_1_dot, theta_2_dot, torque], dim=1
         )
 
         next_state = self.rk4(self._dsdt, state_augmented, [0, self.dt])
 
-        next_state[0] = self.wrap(next_state[0], -np.pi, np.pi)
-        next_state[1] = self.wrap(next_state[1], -np.pi, np.pi)
-        next_state[2] = self.bound(next_state[2], -self.MAX_VEL_1, self.MAX_VEL_1)
-        next_state[3] = self.bound(next_state[3], -self.MAX_VEL_2, self.MAX_VEL_2)
+        next_state[..., 0] = self.wrap(next_state[..., 0], -np.pi, np.pi)
+        next_state[..., 1] = self.wrap(next_state[..., 1], -np.pi, np.pi)
+        next_state[..., 2] = self.bound(
+            next_state[..., 2], -self.MAX_VEL_1, self.MAX_VEL_1
+        )
+        next_state[..., 3] = self.bound(
+            next_state[..., 3], -self.MAX_VEL_2, self.MAX_VEL_2
+        )
 
-        next_state = dict(
-            theta_1=next_state[..., 0],
-            theta_2=next_state[..., 1],
-            theta_dot_1=next_state[..., 2],
-            theta_dot_2=next_state[..., 3],
+        return dict(
+            theta_1=next_state[..., 0].unsqueeze(-1),
+            theta_2=next_state[..., 1].unsqueeze(-1),
+            theta_1_dot=next_state[..., 2].unsqueeze(-1),
+            theta_2_dot=next_state[..., 3].unsqueeze(-1),
         )
 
     def _dsdt(self, s_augmented):
@@ -427,17 +431,13 @@ class Acrobot(nn.Module):
         Returns:
             x: a scalar, wrapped
         """
-        if self._TORCH:
-            float = torch.Tensor.float
-        else:
-            float = lambda: np.ndarray.astype(np.float32)
 
         diff = M - m
         x = x - (x > M).float() * diff
         x = x + (x < m).float() * diff
         return x
 
-    def bound(self, x, m, M=None):
+    def bound(self, x, m, M):
         """Either have m as scalar, so bound(x,m,M) which returns m <= x <= M *OR*
         have m as length 2 vector, bound(x,m, <IGNORED>) returns m[0] <= x <= m[1].
 
@@ -449,18 +449,8 @@ class Acrobot(nn.Module):
         Returns:
             x: scalar, bound between min (m) and Max (M)
         """
-        if self._TORCH:
-            min = torch.min
-            max = torch.max
-        else:
-            min = np.min
-            max = np.max
 
-        if M is None:
-            M = m[1]
-            m = m[0]
-        # bound x between min (m) and Max (M)
-        return torch.min(torch.max(x, m), M)
+        return torch.clamp_(x, m, M)
 
     def rk4(self, derivs, y0, t):
         """
@@ -489,12 +479,12 @@ class Acrobot(nn.Module):
 
         if self._TORCH:
             zeros = torch.zeros
-            asarray = torch.Tensor
-            float = torch.Tensor.float
+            asarray = torch.as_tensor
+            float_ = torch.float32
         else:
             zeros = np.zeros
             asarray = np.asarray
-            float = np.float32
+            float_ = np.float32
 
         try:
             batch_size, Ny = y0.shape
@@ -504,10 +494,10 @@ class Acrobot(nn.Module):
                     batch_size,
                     len(t),
                 ),
-                float,
+                dtype=float_,
             )
         else:
-            yout = zeros((batch_size, len(t), Ny), float)
+            yout = zeros((batch_size, len(t), Ny), dtype=float_)
 
         yout[:, 0] = y0
 
@@ -517,10 +507,10 @@ class Acrobot(nn.Module):
             dt2 = dt / 2.0
             y0 = yout[:, i]
 
-            k1 = derivs(y0)
-            k2 = derivs(y0 + dt2 * k1)
-            k3 = derivs(y0 + dt2 * k2)
-            k4 = derivs(y0 + dt * k3)
+            k1 = asarray(derivs(y0))
+            k2 = asarray(derivs(y0 + dt2 * k1))
+            k3 = asarray(derivs(y0 + dt2 * k2))
+            k4 = asarray(derivs(y0 + dt * k3))
             yout[:, i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
         # We only care about the final timestep and we cleave off action value which will be zero
         return yout[:, -1][:4]
