@@ -72,7 +72,7 @@ def main(args):
         seed=seed,
         vec_env_cls=SubprocVecEnv,
         wrapper_class=GaussianNoiseWrapper,
-        wrapper_kwargs=dict(std_diff_scale=gaussian_noise_scale),
+        wrapper_kwargs=dict(std_diff_ratio=gaussian_noise_scale),
         env_kwargs=dict(goal_velocity=goal_velocity),
     )
     env.seed(seed)
