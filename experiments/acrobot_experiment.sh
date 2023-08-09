@@ -22,7 +22,7 @@ for i in "${!prediction_horizon_list[@]}"; do
 	echo "Seed 1"
 
 	# Run the command
-	python train_acmpc_multienv_acrobot_args. --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_1"
+	python train_acmpc_multienv_acrobot_args.py --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_1"
 
 	# Print the values
 	echo "$prediction_horizon"

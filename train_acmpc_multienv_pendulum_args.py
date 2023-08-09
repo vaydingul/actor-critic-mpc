@@ -175,7 +175,7 @@ if __name__ == "__main__":
     argprs.add_argument("--num_cost_terms", type=int, default=3)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
 
-    argprs.add_argument("--group_name", type=str, default="pendulum_without_sde")
+    argprs.add_argument("--group_name", type=str, default="pendulum_dummy")
     argprs.add_argument("--log_name", type=str, default="acmpc_5_5_action")
     argprs.add_argument("--save_name", type=str, default="model_acmpc_5_5")
 

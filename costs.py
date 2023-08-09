@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from typing import Any
 
+from system import angle_normalize
+
 
 def acrobot_cost(predicted_state, target_state, action=None, cost_dict=None):
     batch_size, prediction_horizon, _ = predicted_state["theta_1"].shape
