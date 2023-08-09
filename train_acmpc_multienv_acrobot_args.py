@@ -7,9 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 
 
-from stable_baselines3.common.vec_env import (
-    SubprocVecEnv,
-)
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecVideoRecorder
 import numpy as np
 from system import Acrobot
 from mpc import ModelPredictiveControlWithoutOptimizer
@@ -44,6 +42,7 @@ def main(args):
     # Learning parameters
     total_timesteps = args.total_timesteps
 
+    group_name = args.group_name
     log_name = args.log_name
     save_name = args.save_name
 
@@ -92,13 +91,20 @@ def main(args):
     # WandB integration
     run = wandb.init(
         project="acmpc",
-        group="acrobot_dummy",
+        group=group_name,
         name=log_name,
         config=args,
         sync_tensorboard=True,
         monitor_gym=True,  # auto-upload the videos of agents playing the game
         save_code=True,  # optional
     )
+
+    # env = VecVideoRecorder(
+    #     env,
+    #     f"videos/{run.id}",
+    #     record_video_trigger=lambda x: x % 2000 == 0,
+    #     video_length=200,
+    # )
 
     # Create model
     model = PPO(
@@ -135,24 +141,28 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=16)
-    argprs.add_argument("--n_steps", type=int, default=128)
-    argprs.add_argument("--batch_size", type=int, default=16 * 128)
+    argprs.add_argument("--n_envs", type=int, default=32)
+    argprs.add_argument("--n_steps", type=int, default=256)
+    argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--gaussian_noise_scale", type=float, default=0.0)
 
     argprs.add_argument("--action_size", type=int, default=1)
-    argprs.add_argument("--prediction_horizon", type=int, default=3)
-    argprs.add_argument("--num_optimization_step", type=int, default=3)
+    argprs.add_argument("--prediction_horizon", type=int, default=2)
+    argprs.add_argument("--num_optimization_step", type=int, default=2)
     argprs.add_argument("--lr", type=float, default=1.0)
 
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=0)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
-    argprs.add_argument("--log_name", type=str, default="acrobot_acmpc_3_3")
-    argprs.add_argument("--save_name", type=str, default="models/acrobot_acmpc_3_3")
+
+    argprs.add_argument("--group_name", type=str, default="acrobot")
+    argprs.add_argument("--log_name", type=str, default="acrobot_acmpc_2_2_noisy")
+    argprs.add_argument(
+        "--save_name", type=str, default="models/acrobot_acmpc_2_2_noisy"
+    )
 
     args = argprs.parse_args()
 

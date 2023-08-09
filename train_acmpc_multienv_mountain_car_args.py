@@ -45,6 +45,7 @@ def main(args):
     # Learning parameters
     total_timesteps = args.total_timesteps
 
+    group_name = args.group_name
     log_name = args.log_name
     save_name = args.save_name
 
@@ -97,7 +98,7 @@ def main(args):
     # WandB integration
     run = wandb.init(
         project="acmpc",
-        group="dynamical_system",
+        group=group_name,
         name=log_name,
         config=args,
         sync_tensorboard=True,
@@ -145,9 +146,9 @@ def main(args):
 if __name__ == "__main__":
     argprs = ArgumentParser()
 
-    argprs.add_argument("--n_envs", type=int, default=16)
+    argprs.add_argument("--n_envs", type=int, default=32)
     argprs.add_argument("--n_steps", type=int, default=256)
-    argprs.add_argument("--batch_size", type=int, default=16 * 256)
+    argprs.add_argument("--batch_size", type=int, default=32 * 256)
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--gaussian_noise_scale", type=float, default=0.0)
@@ -163,6 +164,8 @@ if __name__ == "__main__":
     argprs.add_argument("--predict_cost", type=str, default="False")
     argprs.add_argument("--num_cost_terms", type=int, default=2)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
+
+    argprs.add_argument("--group_name", type=str, default="dynamical_system")
     argprs.add_argument("--log_name", type=str, default="vanilla")
     argprs.add_argument("--save_name", type=str, default="model")
 
