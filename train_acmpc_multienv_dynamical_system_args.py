@@ -23,7 +23,7 @@ from costs import dynamical_system_cost, dynamical_system_obs_to_state_target
 from wandb.integration.sb3 import WandbCallback
 import wandb
 from utils import str_2_bool
-from wrapper import GaussianNoiseWrapper, RelativeRedundant
+from wrapper import GaussianNoiseWrapperRelativeRedundant
 
 WINDOW_SIZE = 512
 
@@ -101,7 +101,7 @@ def main(args):
         env_id,
         n_envs=n_envs,
         seed=seed,
-        wrapper_class=lambda env: GaussianNoiseWrapper(RelativeRedundant(env)),
+        wrapper_class=GaussianNoiseWrapperRelativeRedundant,
         wrapper_kwargs=dict(std_diff_ratio=gaussian_noise_scale),
         vec_env_cls=SubprocVecEnv,
         env_kwargs=dict(
