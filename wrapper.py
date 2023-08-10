@@ -4,6 +4,8 @@ from gymnasium import ObservationWrapper
 import gymnasium as gym
 from gymnasium.spaces import Box, Dict
 
+from typing import Optional, Union, List
+
 
 class RelativeRedundant(ObservationWrapper):
     def __init__(self, env: gym.Env):
@@ -57,7 +59,12 @@ class GaussianNoiseWrapper(ObservationWrapper):
     Inherit the existent observation space and add Gaussian noise to it.
     """
 
-    def __init__(self, env: gym.Env, std_diff_ratio: float = 0.1):
+    def __init__(
+        self,
+        env: gym.Env,
+        std_diff_ratio: float = 0.1,
+        std_value: Optional[Union[float, List[float]]] = None,
+    ):
         super().__init__(env)
 
         # Determine mu based on the low and high values of the observation space
@@ -66,6 +73,9 @@ class GaussianNoiseWrapper(ObservationWrapper):
         self.std = (
             self.observation_space.high - self.observation_space.low
         ) * std_diff_ratio
+
+        if std_value is not None:
+            self.std = std_value
 
     def observation(self, observation) -> np.ndarray:
         return observation + np.random.normal(self.mu, self.std, size=observation.shape)
