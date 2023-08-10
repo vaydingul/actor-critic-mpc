@@ -16,40 +16,40 @@ for i in "${!prediction_horizon_list[@]}"; do
 	# Get the name
 	name="${name[$i]}"
 
-	# # Print the values
-	# echo "$prediction_horizon"
-	# echo "$num_optimization_step"
-	# echo "$name"
-	# echo "Seed 1"
+	# Print the values
+	echo "$prediction_horizon"
+	echo "$num_optimization_step"
+	echo "$name"
+	echo "Seed 1"
 
-	# # Run the command
-	# python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_1"
-
-	# # Print the values
-	# echo "$prediction_horizon"
-	# echo "$num_optimization_step"
-	# echo "$name"
-	# echo "Seed 2"
-
-	# # Run the command
-	# python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0411 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_2"
+	# Run the command
+	python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_1"
 
 	# Print the values
 	echo "$prediction_horizon"
 	echo "$num_optimization_step"
 	echo "$name"
-	echo "Seed 1 Noisy"
+	echo "Seed 2"
 
 	# Run the command
-	python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}_noisy" --save_name "models/${name_main}/${name}_noisy_1"
+	python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0411 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}" --save_name "models/${name_main}/${name}_2"
 
-	# Print the values
-	echo "$prediction_horizon"
-	echo "$num_optimization_step"
-	echo "$name"
-	echo "Seed 2 Noisy"
+	# # Print the values
+	# echo "$prediction_horizon"
+	# echo "$num_optimization_step"
+	# echo "$name"
+	# echo "Seed 1 Noisy"
 
-	# Run the command
-	python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0411 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}_noisy" --save_name "models/${name_main}/${name}_noisy_2"
+	# # Run the command
+	# python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0208 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}_noisy" --save_name "models/${name_main}/${name}_noisy_1"
+
+	# # Print the values
+	# echo "$prediction_horizon"
+	# echo "$num_optimization_step"
+	# echo "$name"
+	# echo "Seed 2 Noisy"
+
+	# # Run the command
+	# python train_acmpc_multienv_cart_pole_args.py --group_name "$group_name" --seed 0411 --prediction_horizon "$prediction_horizon" --num_optimization_step "$num_optimization_step" --log_name "${name_main}_${name}_noisy" --save_name "models/${name_main}/${name}_noisy_2"
 
 done

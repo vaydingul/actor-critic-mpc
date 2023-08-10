@@ -67,18 +67,17 @@ class GaussianNoiseWrapper(ObservationWrapper):
     ):
         super().__init__(env)
 
-        # Determine mu based on the low and high values of the observation space
-        self.mu = (self.observation_space.high + self.observation_space.low) / 2.0
-        # Determine std based on the difference between low and high values of the observation space
-        self.std = (
-            self.observation_space.high - self.observation_space.low
-        ) * std_diff_ratio
-
         if std_value is not None:
             self.std = std_value
+        else:
+            # Determine std based on the difference between low and high values of the observation space
+            self.std = (
+                self.observation_space.high - self.observation_space.low
+            ) * std_diff_ratio
 
     def observation(self, observation) -> np.ndarray:
-        return observation + np.random.normal(self.mu, self.std, size=observation.shape)
+        return observation + np.random.normal(0.0, self.std, size=observation.shape)
+
 
 class GaussianNoiseWrapperRelativeRedundant(ObservationWrapper):
     """
