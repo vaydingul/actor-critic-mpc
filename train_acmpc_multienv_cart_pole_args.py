@@ -33,6 +33,7 @@ def main(args):
     device = args.device
     seed = args.seed
     gaussian_noise_scale = args.gaussian_noise_scale
+
     # System parameters
     goal_velocity = args.goal_velocity
     continuous_reward = args.continuous_reward
@@ -76,7 +77,9 @@ def main(args):
         seed=seed,
         wrapper_class=GaussianNoiseWrapper,
         wrapper_kwargs=dict(std_diff_ratio=gaussian_noise_scale),
-        env_kwargs=dict(continuous_reward=continuous_reward),
+        env_kwargs=dict(
+            continuous_reward=continuous_reward, goal_velocity=goal_velocity
+        ),
         vec_env_cls=SubprocVecEnv,
     )
     env.seed(seed)
@@ -149,6 +152,7 @@ if __name__ == "__main__":
     argprs.add_argument("--device", type=str, default="cpu")
     argprs.add_argument("--seed", type=int, default=42)
     argprs.add_argument("--gaussian_noise_scale", type=float, default=0.0)
+
     argprs.add_argument("--goal_velocity", type=float, default=0.00)
     argprs.add_argument("--continuous_reward", type=str, default="True")
 
