@@ -2,6 +2,7 @@ import env
 from argparse import ArgumentParser
 from policy import (
     ActorCriticModelPredictiveControlPolicy,
+    ActorCriticModelPredictiveControlTeacherForcingPolicy,
 )
 
 from stable_baselines3 import PPO
@@ -46,6 +47,7 @@ def main(args):
     # Policy parameters
     predict_action = str_2_bool(args.predict_action)
     predict_cost = str_2_bool(args.predict_cost)
+    teacher_forcing = args.teacher_forcing
     num_cost_terms = args.num_cost_terms
 
     # Learning parameters
@@ -93,7 +95,10 @@ def main(args):
         policy_class = "MlpPolicy"
         policy_kwargs = dict()
     else:
-        policy_class = ActorCriticModelPredictiveControlPolicy
+        if not teacher_forcing:
+            policy_class = ActorCriticModelPredictiveControlPolicy
+        else:
+            policy_class = ActorCriticModelPredictiveControlTeacherForcingPolicy
         policy_kwargs = dict(
             mpc_class=mpc_class,
             mpc_kwargs=mpc_kwargs,
@@ -112,6 +117,7 @@ def main(args):
         sync_tensorboard=True,
         monitor_gym=True,  # auto-upload the videos of agents playing the game
         save_code=True,  # optional
+        # save_code=False,  # optional
     )
 
     # Create model
@@ -172,6 +178,7 @@ if __name__ == "__main__":
 
     argprs.add_argument("--predict_action", type=str, default="True")
     argprs.add_argument("--predict_cost", type=str, default="False")
+    argprs.add_argument("--teacher_forcing", action="store_true")
     argprs.add_argument("--num_cost_terms", type=int, default=3)
     argprs.add_argument("--total_timesteps", type=int, default=1_000_000)
 
