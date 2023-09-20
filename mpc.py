@@ -96,14 +96,22 @@ class ModelPredictiveControlWithoutOptimizer(nn.Module):
                 retain_graph=True,
                 create_graph=True,
             )[0]
+            # norm = torch.norm(action_grad, 2)
 
-            # torch.nn.utils.clip_grad_norm_(self.action, 1.0)
+            torch.nn.utils.clip_grad_norm_(self.action, 1.0)
 
             # self.action = self.action - self.lr * self.action.grad
             self.action = self.action - self.lr * action_grad
+
+            # if norm > 1.0:
+            #     print(f"Action grad: {action_grad.sum()}, l2: {norm}")
+            #     print(
+            #         f"Action: {self.action.max()}, {self.action.min()}, {self.action.mean()}"
+            #     )
             # self.action.retain_grad()
 
         action = self.action  # .detach()
+        # print(action)
 
         return action, loss
 
@@ -241,12 +249,12 @@ class EnvironmentPredictiveControlWithoutOptimizer(nn.Module):
             )[0]
             print(f"Action grad: {action_grad.sum()}")
             # torch.nn.utils.clip_grad_norm_(self.action, 1.0)
-            
+
             # self.action = self.action - self.lr * self.action.grad
             self.action = self.action - self.lr * action_grad
             # self.action.retain_grad()
-        
-        print(self.action)
+
+        # print(self.action)
         action = self.action  # .detach()
 
         return action, loss

@@ -96,6 +96,7 @@ def main(args):
     # WandB integration
     run = wandb.init(
         project="acmpc",
+        entity="kuavg",
         group=group_name,
         name=log_name,
         config=args,
